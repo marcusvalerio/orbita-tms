@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+:root {
+  /* Paleta ÓRBITA */
+  --color-cosmic-ink: #062540;
+  --color-blue-opal: #124168;
+  --color-suez-canal: #235e80;
+  --color-rowdy-orange: #eaa007;
+  --color-cinnamon: #d26911;
+  --color-milk-mustache: #faf3e6;
+
+  --background: var(--color-milk-mustache);
+  --foreground: var(--color-cosmic-ink);
+}
+
+@theme inline {
+  --color-cosmic-ink: var(--color-cosmic-ink);
+  --color-blue-opal: var(--color-blue-opal);
+  --color-suez-canal: var(--color-suez-canal);
+  --color-rowdy-orange: var(--color-rowdy-orange);
+  --color-cinnamon: var(--color-cinnamon);
+  --color-milk-mustache: var(--color-milk-mustache);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-display: var(--font-sora);
+  --font-body: var(--font-roobert);
+}
+
+body {
+  background: var(--color-milk-mustache);
+  color: var(--color-cosmic-ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Números tabulares para tabelas e métricas — alinhamento consistente */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
