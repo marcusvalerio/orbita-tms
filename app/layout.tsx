@@ -32,9 +32,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${sora.variable} ${roobertStandIn.variable} antialiased`}>
-        <div className="flex min-h-screen">
+        <div className="flex h-screen overflow-hidden">
           <Sidebar />
-          <main className="flex-1 min-w-0">{children}</main>
+          <main className="flex-1 min-w-0 h-screen overflow-y-auto">{children}</main>
         </div>
       </body>
     </html>

@@ -50,7 +50,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col bg-cosmic-ink text-milk-mustache shrink-0">
+    <aside className="hidden md:flex md:w-64 md:flex-col h-screen bg-cosmic-ink text-milk-mustache shrink-0">
       <div className="px-6 py-6 border-b border-white/10">
         <Link href="/" className="block">
           <span className="font-display font-semibold text-lg tracking-tight">

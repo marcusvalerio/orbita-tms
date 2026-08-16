@@ -1,5 +1,14 @@
-import { getOverviewMetrics, getOperationalAlerts } from "@/lib/data/atlas";
-import { StatCard } from "@/components/ui/StatCard";
+import Link from "next/link";
+import {
+  getOverviewMetrics,
+  getOperationalAlerts,
+  getActiveShipments,
+  getExceptionQueue,
+  getPlanningQueue,
+  getRecentActivity,
+} from "@/lib/data/atlas";
+import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 const SEVERITY_STYLES: Record<string, string> = {
   info: "border-blue-opal/20 bg-blue-opal/5 text-blue-opal",
@@ -7,87 +16,174 @@ const SEVERITY_STYLES: Record<string, string> = {
   critical: "border-cinnamon/25 bg-cinnamon/8 text-cinnamon",
 };
 
+function timeAgo(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const hours = Math.round(diffMs / 3600000);
+  if (Math.abs(hours) < 1) return "agora";
+  if (hours > 0) return `há ${hours}h`;
+  return `em ${Math.abs(hours)}h`;
+}
+
 export default function OverviewPage() {
   const metrics = getOverviewMetrics();
   const alerts = getOperationalAlerts();
+  const activeShipments = getActiveShipments();
+  const exceptions = getExceptionQueue();
+  const { ordersAwaiting, loadsAwaitingCarrier } = getPlanningQueue();
+  const recentActivity = getRecentActivity();
 
   return (
-    <div className="px-6 py-8 md:px-10 md:py-10 max-w-6xl">
-      <header className="mb-8">
-        <p className="text-xs uppercase tracking-wider text-cosmic-ink/50 mb-1">
-          Atlas Distribuição — Sudeste
-        </p>
-        <h1 className="font-display font-semibold text-2xl md:text-3xl text-cosmic-ink">
-          ÓRBITA — Overview
-        </h1>
-        <p className="text-sm text-cosmic-ink/60 mt-1">
-          O que está acontecendo na operação, agora.
-        </p>
-      </header>
-
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <StatCard label="Pedidos" value={metrics.orderCount} accent="cosmic" />
-        <StatCard label="Cargas" value={metrics.loadCount} accent="cosmic" />
-        <StatCard label="Viagens" value={metrics.shipmentCount} accent="cosmic" />
-        <StatCard label="Entregas" value={metrics.deliveryCount} accent="cosmic" />
-      </section>
-
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        <StatCard label="OTIF" value={metrics.otifPercent} suffix="%" accent="opal" />
-        <StatCard label="OTD" value={metrics.otdPercent} suffix="%" accent="opal" />
-        <StatCard label="Ocupação" value={metrics.occupancyPercent} suffix="%" accent="opal" />
-        <StatCard
-          label="Custo / entrega"
-          value={`R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`}
-          accent="opal"
-        />
-      </section>
-
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
-          <h2 className="font-display font-semibold text-sm uppercase tracking-wider text-cosmic-ink/50 mb-3">
-            Situação
-          </h2>
-          <div className="space-y-2">
-            <SituationRow label="Normais" value={metrics.normalCount} dot="bg-emerald-600" />
-            <SituationRow label="Em atenção" value={metrics.attentionCount} dot="bg-rowdy-orange" />
-            <SituationRow label="Com ocorrência" value={metrics.occurrenceCount} dot="bg-cinnamon" />
+    <>
+      <WorkspaceHeader
+        section="Atlas Distribuição · Sudeste"
+        title="Overview"
+        meta="O que está acontecendo na operação, agora."
+      />
+      <div className="px-6 md:px-10 py-6 space-y-8">
+        {/* OPERATION STATUS */}
+        <Section title="Operation Status">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MiniStat label="Pedidos" value={metrics.orderCount} />
+            <MiniStat label="Cargas" value={metrics.loadCount} />
+            <MiniStat label="Viagens" value={metrics.shipmentCount} />
+            <MiniStat label="Entregas" value={metrics.deliveryCount} />
           </div>
+          {alerts.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`rounded-md border px-4 py-2.5 text-sm ${SEVERITY_STYLES[alert.severity]}`}
+                >
+                  {alert.message}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* ACTIVE SHIPMENTS */}
+          <Section title="Active Shipments" href="/shipments" count={activeShipments.length}>
+            <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
+              {activeShipments.length === 0 && <EmptyRow text="Nenhuma viagem ativa no momento." />}
+              {activeShipments.map(({ shipment, origin, destination, carrierName }) => (
+                <div key={shipment.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-display font-medium text-sm text-cosmic-ink">{shipment.id}</p>
+                    <p className="text-xs text-cosmic-ink/55 truncate">
+                      {origin?.city} → {destination?.city} · {carrierName}
+                    </p>
+                  </div>
+                  <StatusBadge status={shipment.status} />
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          {/* EXCEPTIONS */}
+          <Section title="Exceptions" href="/occurrences" count={exceptions.length}>
+            <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
+              {exceptions.length === 0 && <EmptyRow text="Nenhuma exceção em aberto." />}
+              {exceptions.map(({ occurrence, shipment }) => (
+                <div key={occurrence.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-display font-medium text-sm text-cosmic-ink">{occurrence.type}</p>
+                    <p className="text-xs text-cosmic-ink/55 truncate">{shipment?.id}</p>
+                  </div>
+                  <span className="text-xs font-medium text-cinnamon shrink-0">{occurrence.severity}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          {/* PLANNING QUEUE */}
+          <Section title="Planning Queue" href="/planning" count={ordersAwaiting.length + loadsAwaitingCarrier.length}>
+            <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3 space-y-2">
+              <QueueRow label="Pedidos aguardando planejamento" value={ordersAwaiting.length} />
+              <QueueRow label="Cargas aguardando contratação" value={loadsAwaitingCarrier.length} />
+            </div>
+          </Section>
+
+          {/* PERFORMANCE */}
+          <Section title="Performance" href="/kpis">
+            <div className="grid grid-cols-2 gap-3">
+              <MiniStat label="OTIF" value={metrics.otifPercent} suffix="%" />
+              <MiniStat label="OTD" value={metrics.otdPercent} suffix="%" />
+              <MiniStat label="Ocupação" value={metrics.occupancyPercent} suffix="%" />
+              <MiniStat label="Custo/entrega" value={`R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`} />
+            </div>
+          </Section>
         </div>
 
-        <div className="md:col-span-2">
-          <h2 className="font-display font-semibold text-sm uppercase tracking-wider text-cosmic-ink/50 mb-3">
-            Operational Alerts
-          </h2>
-          <div className="space-y-2">
-            {alerts.length === 0 && (
-              <p className="text-sm text-cosmic-ink/50">
-                Nenhum alerta operacional no momento.
-              </p>
-            )}
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={`rounded-md border px-4 py-3 text-sm ${SEVERITY_STYLES[alert.severity]}`}
-              >
-                {alert.message}
+        {/* RECENT ACTIVITY */}
+        <Section title="Recent Activity">
+          <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
+            {recentActivity.map((event) => (
+              <div key={event.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                <p className="text-sm text-cosmic-ink/80">{event.label}</p>
+                <p className="text-xs text-cosmic-ink/45 tabular shrink-0">{timeAgo(event.timestamp)}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </Section>
+      </div>
+    </>
+  );
+}
+
+function Section({
+  title,
+  href,
+  count,
+  children,
+}: {
+  title: string;
+  href?: string;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  const heading = (
+    <h2 className="font-display font-semibold text-sm uppercase tracking-wider text-cosmic-ink/50 mb-3">
+      {title}
+      {typeof count === "number" && <span className="ml-2 text-cosmic-ink/30">{count}</span>}
+    </h2>
+  );
+  return (
+    <section>
+      {href ? (
+        <Link href={href} className="inline-block hover:text-blue-opal">
+          {heading}
+        </Link>
+      ) : (
+        heading
+      )}
+      {children}
+    </section>
+  );
+}
+
+function MiniStat({ label, value, suffix }: { label: string; value: string | number; suffix?: string }) {
+  return (
+    <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/50 mb-1">{label}</p>
+      <p className="font-display font-semibold text-2xl tabular text-cosmic-ink">
+        {value}
+        {suffix && <span className="text-base font-medium ml-0.5">{suffix}</span>}
+      </p>
     </div>
   );
 }
 
-function SituationRow({ label, value, dot }: { label: string; value: number; dot: string }) {
+function QueueRow({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between rounded-md border border-cosmic-ink/10 bg-white/60 px-4 py-3">
-      <span className="flex items-center gap-2 text-sm text-cosmic-ink/80">
-        <span className={`h-2 w-2 rounded-full ${dot}`} />
-        {label}
-      </span>
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-cosmic-ink/70">{label}</span>
       <span className="font-display font-semibold tabular text-cosmic-ink">{value}</span>
     </div>
   );
+}
+
+function EmptyRow({ text }: { text: string }) {
+  return <div className="px-4 py-3 text-sm text-cosmic-ink/45">{text}</div>;
 }
