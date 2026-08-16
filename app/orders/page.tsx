@@ -1,9 +1,11 @@
-import { getOperationData } from "@/lib/data/atlas";
+"use client";
+
+import { useSimulation } from "@/components/simulation/SimulationProvider";
 import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import { OrdersWorkspace } from "@/components/orders/OrdersWorkspace";
 
 export default function OrdersPage() {
-  const data = getOperationData();
+  const { data } = useSimulation();
 
   const locationById = new Map(data.locations.map((l) => [l.id, l]));
   const customerById = new Map(data.customers.map((c) => [c.id, c]));

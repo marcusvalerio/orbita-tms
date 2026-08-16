@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Order, Location, Customer, Load, Shipment } from "@/lib/domain/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
@@ -196,12 +198,32 @@ function OrderDetailPanel({
 
       {order.status === "Aguardando planejamento" && (
         <div className="px-6 py-5">
-          <button className="w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors">
-            Plan Transport
-          </button>
+          <PlanTransportButton orderId={order.id} />
+        </div>
+      )}
+      {shipment && (
+        <div className="px-6 py-5">
+          <Link
+            href={`/shipments/${shipment.id}`}
+            className="block w-full text-center rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2.5 hover:bg-cosmic-ink/5 transition-colors"
+          >
+            Ver Viagem {shipment.id}
+          </Link>
         </div>
       )}
     </aside>
+  );
+}
+
+function PlanTransportButton({ orderId }: { orderId: string }) {
+  const router = useRouter();
+  return (
+    <button
+      onClick={() => router.push(`/planning?order=${orderId}`)}
+      className="w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors"
+    >
+      Plan Transport
+    </button>
   );
 }
 

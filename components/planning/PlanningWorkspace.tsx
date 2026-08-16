@@ -1,21 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Order, Location, Carrier, Vehicle } from "@/lib/domain/types";
 import { quoteTransportOptions, findVehicleForWeight } from "@/lib/planning/quote";
+import { useSimulation } from "@/components/simulation/SimulationProvider";
 
 export function PlanningWorkspace({
   orders,
   locationById,
   carriers,
   vehicles,
+  preselectedOrderId,
 }: {
   orders: Order[];
   locationById: Map<string, Location>;
   carriers: Carrier[];
   vehicles: Vehicle[];
+  preselectedOrderId?: string | null;
 }) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { data, createLoad, createShipment } = useSimulation();
+  const router = useRouter();
+
+  const [selectedIds, setSelectedIds] = useState<string[]>(preselectedOrderId ? [preselectedOrderId] : []);
+  const [pendingLoadKey, setPendingLoadKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (preselectedOrderId && orders.some((o) => o.id === preselectedOrderId)) {
+      setSelectedIds([preselectedOrderId]);
+    }
+  }, [preselectedOrderId, orders]);
 
   const toggle = (orderId: string) => {
     setSelectedIds((prev) =>
@@ -36,7 +50,6 @@ export function PlanningWorkspace({
     [capacityOk, totalWeightKg, carriers]
   );
 
-  // Só permite consolidar pedidos com a mesma origem/destino — coerência operacional.
   const referenceOrder = selectedOrders[0];
   const compatibleOrderIds = new Set(
     referenceOrder
@@ -45,6 +58,31 @@ export function PlanningWorkspace({
           .map((o) => o.id)
       : orders.map((o) => o.id)
   );
+
+  // Encontra a carga recém-criada procurando por um load cujo conjunto de pedidos
+  // corresponda exatamente à seleção pendente (o reducer gera o id internamente).
+  const createdLoad = pendingLoadKey
+    ? data.loads.find((l) => [...l.orderIds].sort().join(",") === pendingLoadKey)
+    : undefined;
+
+  const handleConsolidate = () => {
+    if (!capacityOk || selectedOrders.length === 0) return;
+    const key = [...selectedIds].sort().join(",");
+    setPendingLoadKey(key);
+    createLoad(selectedIds);
+  };
+
+  const handleSelectTransport = (optionId: string) => {
+    if (!createdLoad) return;
+    const option = options.find((o) => o.id === optionId);
+    if (!option) return;
+    createShipment(createdLoad.id, option);
+    // A viagem recém-criada é a última com esse loadId — navega para o detalhe dela.
+    setTimeout(() => {
+      const shipment = data.shipments.find((s) => s.loadId === createdLoad.id);
+      if (shipment) router.push(`/shipments/${shipment.id}`);
+    }, 0);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(100vh-73px)] overflow-hidden divide-x divide-cosmic-ink/10">
@@ -62,8 +100,8 @@ export function PlanningWorkspace({
             return (
               <button
                 key={order.id}
-                onClick={() => isCompatible && toggle(order.id)}
-                disabled={!isCompatible}
+                onClick={() => isCompatible && !createdLoad && toggle(order.id)}
+                disabled={!isCompatible || !!createdLoad}
                 className={`w-full text-left px-5 py-3 transition-colors ${
                   isSelected
                     ? "bg-blue-opal/10"
@@ -95,6 +133,11 @@ export function PlanningWorkspace({
             <p className="text-sm text-cosmic-ink/45">Selecione pedidos compatíveis à esquerda.</p>
           ) : (
             <>
+              {createdLoad && (
+                <p className="mb-3 inline-block rounded-full bg-blue-opal/10 text-blue-opal text-xs font-medium px-2.5 py-1">
+                  {createdLoad.id} criada
+                </p>
+              )}
               <p className="font-display font-semibold text-lg text-cosmic-ink mb-1">
                 {selectedOrders.length} pedido{selectedOrders.length > 1 ? "s" : ""}
               </p>
@@ -140,12 +183,15 @@ export function PlanningWorkspace({
                 ))}
               </ul>
 
-              <button
-                disabled={!capacityOk}
-                className="mt-5 w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Consolidar Carga
-              </button>
+              {!createdLoad && (
+                <button
+                  onClick={handleConsolidate}
+                  disabled={!capacityOk}
+                  className="mt-5 w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Consolidar Carga
+                </button>
+              )}
             </>
           )}
         </div>
@@ -157,30 +203,25 @@ export function PlanningWorkspace({
           Transport Options
         </p>
         <div className="px-5 py-4 space-y-2">
-          {!capacityOk && selectedOrders.length > 0 && (
-            <p className="text-sm text-cosmic-ink/45">
-              Resolva a capacidade da carga antes de contratar transporte.
-            </p>
-          )}
-          {capacityOk && options.length === 0 && (
-            <p className="text-sm text-cosmic-ink/45">Componha uma carga para ver opções de transporte.</p>
-          )}
-          {options.map((option) => (
-            <div
-              key={option.id}
-              className="rounded-md border border-cosmic-ink/10 bg-white/60 px-4 py-3 flex items-center justify-between"
-            >
-              <div>
-                <p className="font-display font-medium text-sm text-cosmic-ink">{option.label}</p>
-                <p className="text-xs text-cosmic-ink/55">
-                  D+{option.etaDays} · SLA {option.slaPercent}%
+          {!createdLoad && <p className="text-sm text-cosmic-ink/45">Consolide a carga para ver opções de transporte.</p>}
+          {createdLoad &&
+            options.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => handleSelectTransport(option.id)}
+                className="w-full text-left rounded-md border border-cosmic-ink/10 bg-white/60 px-4 py-3 flex items-center justify-between hover:border-blue-opal/40 hover:bg-blue-opal/5 transition-colors"
+              >
+                <div>
+                  <p className="font-display font-medium text-sm text-cosmic-ink">{option.label}</p>
+                  <p className="text-xs text-cosmic-ink/55">
+                    D+{option.etaDays} · SLA {option.slaPercent}%
+                  </p>
+                </div>
+                <p className="font-display font-semibold tabular text-cosmic-ink">
+                  R$ {option.price.toLocaleString("pt-BR")}
                 </p>
-              </div>
-              <p className="font-display font-semibold tabular text-cosmic-ink">
-                R$ {option.price.toLocaleString("pt-BR")}
-              </p>
-            </div>
-          ))}
+              </button>
+            ))}
         </div>
       </div>
     </div>

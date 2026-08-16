@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useSimulation } from "@/components/simulation/SimulationProvider";
 import {
   getOverviewMetrics,
   getOperationalAlerts,
@@ -25,12 +28,13 @@ function timeAgo(iso: string) {
 }
 
 export default function OverviewPage() {
-  const metrics = getOverviewMetrics();
-  const alerts = getOperationalAlerts();
-  const activeShipments = getActiveShipments();
-  const exceptions = getExceptionQueue();
-  const { ordersAwaiting, loadsAwaitingCarrier } = getPlanningQueue();
-  const recentActivity = getRecentActivity();
+  const { data } = useSimulation();
+  const metrics = getOverviewMetrics(data);
+  const alerts = getOperationalAlerts(data);
+  const activeShipments = getActiveShipments(data);
+  const exceptions = getExceptionQueue(data);
+  const { ordersAwaiting, loadsAwaitingCarrier } = getPlanningQueue(data);
+  const recentActivity = getRecentActivity(data);
 
   return (
     <>
@@ -40,7 +44,6 @@ export default function OverviewPage() {
         meta="O que está acontecendo na operação, agora."
       />
       <div className="px-6 md:px-10 py-6 space-y-8">
-        {/* OPERATION STATUS */}
         <Section title="Operation Status">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <MiniStat label="Pedidos" value={metrics.orderCount} />
@@ -63,12 +66,15 @@ export default function OverviewPage() {
         </Section>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* ACTIVE SHIPMENTS */}
           <Section title="Active Shipments" href="/shipments" count={activeShipments.length}>
             <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
               {activeShipments.length === 0 && <EmptyRow text="Nenhuma viagem ativa no momento." />}
               {activeShipments.map(({ shipment, origin, destination, carrierName }) => (
-                <div key={shipment.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                <Link
+                  key={shipment.id}
+                  href={`/shipments/${shipment.id}`}
+                  className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-opal/5 transition-colors"
+                >
                   <div className="min-w-0">
                     <p className="font-display font-medium text-sm text-cosmic-ink">{shipment.id}</p>
                     <p className="text-xs text-cosmic-ink/55 truncate">
@@ -76,28 +82,30 @@ export default function OverviewPage() {
                     </p>
                   </div>
                   <StatusBadge status={shipment.status} />
-                </div>
+                </Link>
               ))}
             </div>
           </Section>
 
-          {/* EXCEPTIONS */}
-          <Section title="Exceptions" href="/occurrences" count={exceptions.length}>
+          <Section title="Exceptions" count={exceptions.length}>
             <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
               {exceptions.length === 0 && <EmptyRow text="Nenhuma exceção em aberto." />}
               {exceptions.map(({ occurrence, shipment }) => (
-                <div key={occurrence.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                <Link
+                  key={occurrence.id}
+                  href={shipment ? `/shipments/${shipment.id}` : "#"}
+                  className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-cinnamon/5 transition-colors"
+                >
                   <div className="min-w-0">
                     <p className="font-display font-medium text-sm text-cosmic-ink">{occurrence.type}</p>
                     <p className="text-xs text-cosmic-ink/55 truncate">{shipment?.id}</p>
                   </div>
                   <span className="text-xs font-medium text-cinnamon shrink-0">{occurrence.severity}</span>
-                </div>
+                </Link>
               ))}
             </div>
           </Section>
 
-          {/* PLANNING QUEUE */}
           <Section title="Planning Queue" href="/planning" count={ordersAwaiting.length + loadsAwaitingCarrier.length}>
             <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3 space-y-2">
               <QueueRow label="Pedidos aguardando planejamento" value={ordersAwaiting.length} />
@@ -105,8 +113,7 @@ export default function OverviewPage() {
             </div>
           </Section>
 
-          {/* PERFORMANCE */}
-          <Section title="Performance" href="/kpis">
+          <Section title="Performance">
             <div className="grid grid-cols-2 gap-3">
               <MiniStat label="OTIF" value={metrics.otifPercent} suffix="%" />
               <MiniStat label="OTD" value={metrics.otdPercent} suffix="%" />
@@ -116,9 +123,9 @@ export default function OverviewPage() {
           </Section>
         </div>
 
-        {/* RECENT ACTIVITY */}
         <Section title="Recent Activity">
           <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
+            {recentActivity.length === 0 && <EmptyRow text="Nenhuma atividade recente." />}
             {recentActivity.map((event) => (
               <div key={event.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
                 <p className="text-sm text-cosmic-ink/80">{event.label}</p>

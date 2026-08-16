@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Sora, Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { SimulationProvider } from "@/components/simulation/SimulationProvider";
+import { ToastStack } from "@/components/simulation/ToastStack";
 
 // Roobert é uma fonte licenciada (Displaay Type Foundry) e não está disponível
 // via Google Fonts/npm. Usamos Inter como substituto provisório com a mesma
@@ -32,10 +34,13 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${sora.variable} ${roobertStandIn.variable} antialiased`}>
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 min-w-0 h-screen overflow-y-auto">{children}</main>
-        </div>
+        <SimulationProvider>
+          <div className="flex h-screen overflow-hidden">
+            <Sidebar />
+            <main className="flex-1 min-w-0 h-screen overflow-y-auto">{children}</main>
+          </div>
+          <ToastStack />
+        </SimulationProvider>
       </body>
     </html>
   );

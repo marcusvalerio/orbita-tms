@@ -1,9 +1,16 @@
-import { getOperationData } from "@/lib/data/atlas";
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useSimulation } from "@/components/simulation/SimulationProvider";
 import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import { PlanningWorkspace } from "@/components/planning/PlanningWorkspace";
 
-export default function PlanningPage() {
-  const data = getOperationData();
+function PlanningPageInner() {
+  const { data } = useSimulation();
+  const searchParams = useSearchParams();
+  const preselectedOrderId = searchParams.get("order");
+
   const locationById = new Map(data.locations.map((l) => [l.id, l]));
   const ordersAwaiting = data.orders.filter((o) => o.status === "Aguardando planejamento");
 
@@ -19,7 +26,16 @@ export default function PlanningPage() {
         locationById={locationById}
         carriers={data.carriers}
         vehicles={data.vehicles}
+        preselectedOrderId={preselectedOrderId}
       />
     </>
+  );
+}
+
+export default function PlanningPage() {
+  return (
+    <Suspense fallback={null}>
+      <PlanningPageInner />
+    </Suspense>
   );
 }

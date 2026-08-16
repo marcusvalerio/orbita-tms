@@ -159,7 +159,7 @@ export function generateAtlasOperation(): OperationDataset {
     { type: "Truck", capKg: 8000, capM3: 40 },
     { type: "Carreta", capKg: 27000, capM3: 90 },
   ];
-  const vehicleCount = intBetween(rng, 30, 40);
+  const vehicleCount = 15;
   const vehicles: Vehicle[] = Array.from({ length: vehicleCount }, (_, i) => {
     const spec = pick(rng, vehicleTypes);
     return {
@@ -182,7 +182,7 @@ export function generateAtlasOperation(): OperationDataset {
   }));
 
   // --- Carriers -----------------------------------------------------------
-  const carrierCount = intBetween(rng, 8, 12);
+  const carrierCount = 5;
   const carriers: Carrier[] = CARRIER_NAMES.slice(0, carrierCount).map((name, i) => ({
     id: `carrier-${pad(i + 1, 2)}`,
     name,
@@ -196,14 +196,15 @@ export function generateAtlasOperation(): OperationDataset {
 
   // --- Orders -------------------------------------------------------------
   const orderStatusPool: OrderStatus[] = [
+    "Aguardando planejamento", "Aguardando planejamento", "Aguardando planejamento",
     "Aguardando planejamento", "Aguardando planejamento",
-    "Planejado", "Planejado",
-    "Em transporte", "Em transporte", "Em transporte",
-    "Entregue", "Entregue", "Entregue", "Entregue", "Entregue",
+    "Planejado",
+    "Em transporte", "Em transporte",
+    "Entregue", "Entregue", "Entregue", "Entregue",
     "Com ocorrência",
   ];
 
-  const orderCount = 46;
+  const orderCount = 20;
   const orders: Order[] = Array.from({ length: orderCount }, (_, i) => {
     const origin = pick(rng, cds);
     const destination = pick(rng, clientLocations);
