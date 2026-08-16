@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Order, Location, Carrier, Vehicle } from "@/lib/domain/types";
-import { quoteTransportOptions, findVehicleForWeight } from "@/lib/planning/quote";
+import { quoteTransportOptions, findVehicleForWeight, type TransportOptionQuote } from "@/lib/planning/quote";
 import { useSimulation } from "@/components/simulation/SimulationProvider";
 
 export function PlanningWorkspace({
@@ -24,6 +24,7 @@ export function PlanningWorkspace({
 
   const [selectedIds, setSelectedIds] = useState<string[]>(preselectedOrderId ? [preselectedOrderId] : []);
   const [pendingLoadKey, setPendingLoadKey] = useState<string | null>(null);
+  const [chosenOption, setChosenOption] = useState<TransportOptionQuote | null>(null);
 
   useEffect(() => {
     if (preselectedOrderId && orders.some((o) => o.id === preselectedOrderId)) {
@@ -72,12 +73,9 @@ export function PlanningWorkspace({
     createLoad(selectedIds);
   };
 
-  const handleSelectTransport = (optionId: string) => {
-    if (!createdLoad) return;
-    const option = options.find((o) => o.id === optionId);
-    if (!option) return;
-    createShipment(createdLoad.id, option);
-    // A viagem recém-criada é a última com esse loadId — navega para o detalhe dela.
+  const handleConfirmContracting = () => {
+    if (!createdLoad || !chosenOption) return;
+    createShipment(createdLoad.id, chosenOption);
     setTimeout(() => {
       const shipment = data.shipments.find((s) => s.loadId === createdLoad.id);
       if (shipment) router.push(`/shipments/${shipment.id}`);
@@ -85,11 +83,11 @@ export function PlanningWorkspace({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(100vh-73px)] overflow-hidden divide-x divide-cosmic-ink/10">
-      {/* LEFT — Orders awaiting planning */}
+    <div className="grid grid-cols-1 md:grid-cols-3 flex-1 min-h-0 overflow-hidden divide-x divide-cosmic-ink/10">
+      {/* ESQUERDA — Pedidos aguardando planejamento */}
       <div className="overflow-y-auto">
         <p className="sticky top-0 bg-milk-mustache px-5 py-3 text-[11px] uppercase tracking-wider text-cosmic-ink/50 border-b border-cosmic-ink/10">
-          Orders Awaiting Planning · {orders.length}
+          Pedidos Aguardando Planejamento · {orders.length}
         </p>
         <div className="divide-y divide-cosmic-ink/5">
           {orders.map((order) => {
@@ -123,10 +121,10 @@ export function PlanningWorkspace({
         </div>
       </div>
 
-      {/* CENTER — Load composition */}
+      {/* CENTRO — Composição da carga */}
       <div className="overflow-y-auto">
         <p className="sticky top-0 bg-milk-mustache px-5 py-3 text-[11px] uppercase tracking-wider text-cosmic-ink/50 border-b border-cosmic-ink/10">
-          Load Composition
+          Composição da Carga
         </p>
         <div className="px-5 py-4">
           {selectedOrders.length === 0 ? (
@@ -197,33 +195,92 @@ export function PlanningWorkspace({
         </div>
       </div>
 
-      {/* RIGHT — Transport options */}
+      {/* DIREITA — Cotação, comparação e contratação */}
       <div className="overflow-y-auto">
         <p className="sticky top-0 bg-milk-mustache px-5 py-3 text-[11px] uppercase tracking-wider text-cosmic-ink/50 border-b border-cosmic-ink/10">
-          Transport Options
+          Opções de Transporte
         </p>
-        <div className="px-5 py-4 space-y-2">
-          {!createdLoad && <p className="text-sm text-cosmic-ink/45">Consolide a carga para ver opções de transporte.</p>}
-          {createdLoad &&
-            options.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => handleSelectTransport(option.id)}
-                className="w-full text-left rounded-md border border-cosmic-ink/10 bg-white/60 px-4 py-3 flex items-center justify-between hover:border-blue-opal/40 hover:bg-blue-opal/5 transition-colors"
-              >
-                <div>
-                  <p className="font-display font-medium text-sm text-cosmic-ink">{option.label}</p>
-                  <p className="text-xs text-cosmic-ink/55">
-                    D+{option.etaDays} · SLA {option.slaPercent}%
-                  </p>
+        <div className="px-5 py-4 space-y-3">
+          {!createdLoad && (
+            <p className="text-sm text-cosmic-ink/45">Consolide a carga para ver opções de transporte.</p>
+          )}
+
+          {createdLoad && !chosenOption && (
+            <>
+              <p className="text-xs text-cosmic-ink/45">
+                Valor de frete simulado — não representa tabela real de nenhuma transportadora. Menor frete não é
+                necessariamente a melhor opção: compare SLA e nível de serviço (OTIF).
+              </p>
+              {options.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => setChosenOption(option)}
+                  className="w-full text-left rounded-md border border-cosmic-ink/10 bg-white/60 px-4 py-3 hover:border-blue-opal/40 hover:bg-blue-opal/5 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="font-display font-medium text-sm text-cosmic-ink">{option.label}</p>
+                    <p className="font-display font-semibold tabular text-cosmic-ink">
+                      R$ {option.price.toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <div className="mt-1.5 flex gap-3 text-xs text-cosmic-ink/55">
+                    <span>Prazo D+{option.etaDays}</span>
+                    <span>SLA {option.slaPercent}%</span>
+                    <span>Nível de Serviço (OTIF) {option.otifPercent}%</span>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+
+          {chosenOption && (
+            <div className="rounded-md border border-blue-opal/25 bg-blue-opal/5 px-4 py-4">
+              <p className="text-[11px] uppercase tracking-wider text-blue-opal/70 mb-1">Transporte Selecionado</p>
+              <p className="font-display font-semibold text-cosmic-ink mb-3">{chosenOption.label}</p>
+
+              <div className="space-y-1.5 text-sm">
+                <BreakdownRow label="Frete peso" value={chosenOption.breakdown.freightWeight} />
+                <BreakdownRow label="Ad Valorem" value={chosenOption.breakdown.adValorem} />
+                <BreakdownRow label="GRIS" value={chosenOption.breakdown.gris} />
+                <BreakdownRow label="Pedágio" value={chosenOption.breakdown.toll} />
+                <BreakdownRow label="Taxa de entrega" value={chosenOption.breakdown.deliveryFee} />
+                <div className="border-t border-blue-opal/20 pt-1.5 mt-1.5 flex justify-between font-display font-semibold text-cosmic-ink">
+                  <span>Total</span>
+                  <span className="tabular">R$ {chosenOption.breakdown.total.toLocaleString("pt-BR")}</span>
                 </div>
-                <p className="font-display font-semibold tabular text-cosmic-ink">
-                  R$ {option.price.toLocaleString("pt-BR")}
-                </p>
-              </button>
-            ))}
+              </div>
+
+              <p className="text-[11px] text-cosmic-ink/40 mt-2">
+                Frete simulado para fins didáticos · Prazo D+{chosenOption.etaDays} · SLA {chosenOption.slaPercent}%
+              </p>
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setChosenOption(null)}
+                  className="flex-1 rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2 hover:bg-cosmic-ink/5 transition-colors"
+                >
+                  Trocar
+                </button>
+                <button
+                  onClick={handleConfirmContracting}
+                  className="flex-1 rounded-md bg-blue-opal text-white text-sm font-medium py-2 hover:bg-blue-opal/90 transition-colors"
+                >
+                  Confirmar Contratação
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function BreakdownRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex justify-between text-cosmic-ink/70">
+      <span>{label}</span>
+      <span className="tabular">R$ {value.toLocaleString("pt-BR")}</span>
     </div>
   );
 }

@@ -561,5 +561,6 @@ export function generateAtlasOperation(): OperationDataset {
     freights,
     documents,
     kpiHistory,
+    orderEvents: [],
   };
 }

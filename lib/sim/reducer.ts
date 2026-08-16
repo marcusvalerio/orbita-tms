@@ -1,6 +1,7 @@
 import type {
   OperationDataset,
   Order,
+  OrderItem,
   Load,
   Shipment,
   Occurrence,
@@ -8,10 +9,21 @@ import type {
   OccurrenceAction,
   Delivery,
   TmsDocument,
+  OrderEvent,
 } from "../domain/types";
 import type { TransportOptionQuote } from "../planning/quote";
 
+export interface NewOrderInput {
+  customerId: string;
+  originId: string;
+  destinationId: string;
+  totalWeightKg: number;
+  priority: "Normal" | "Alta" | "Urgente";
+  dueDate: string;
+}
+
 export type SimulationAction =
+  | { type: "CREATE_ORDER"; input: NewOrderInput }
   | { type: "CREATE_LOAD"; orderIds: string[] }
   | { type: "CREATE_SHIPMENT"; loadId: string; option: TransportOptionQuote }
   | { type: "START_SHIPMENT"; shipmentId: string }
@@ -26,8 +38,41 @@ function nextId(prefix: string, pad = 5) {
   return `${prefix}-${seq.toString().padStart(pad, "0")}`;
 }
 
+function withEvents(events: OrderEvent[], orderIds: string[], message: string): OrderEvent[] {
+  const now = new Date().toISOString();
+  const newEvents = orderIds.map((orderId) => ({ id: nextId("evt", 4), orderId, message, timestamp: now }));
+  return [...events, ...newEvents];
+}
+
 export function reduce(state: OperationDataset, action: SimulationAction): OperationDataset {
   switch (action.type) {
+    case "CREATE_ORDER": {
+      const { input } = action;
+      const item: OrderItem = {
+        id: nextId("item", 4),
+        productId: "prod-01",
+        quantity: 1,
+        weightKg: input.totalWeightKg,
+      };
+      const order: Order = {
+        id: nextId("PED"),
+        originId: input.originId,
+        destinationId: input.destinationId,
+        customerId: input.customerId,
+        items: [item],
+        totalWeightKg: input.totalWeightKg,
+        totalVolumeM3: Math.round((input.totalWeightKg / 140) * 10) / 10,
+        dueDate: input.dueDate,
+        priority: input.priority,
+        status: "Aguardando planejamento",
+      };
+      return {
+        ...state,
+        orders: [...state.orders, order],
+        orderEvents: withEvents(state.orderEvents, [order.id], "Pedido criado e enviado para planejamento."),
+      };
+    }
+
     case "CREATE_LOAD": {
       const orders = state.orders.filter((o) => action.orderIds.includes(o.id));
       if (orders.length === 0) return state;
@@ -48,6 +93,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         orders: state.orders.map((o) =>
           action.orderIds.includes(o.id) ? { ...o, status: "Planejado", loadId: load.id } : o
         ),
+        orderEvents: withEvents(state.orderEvents, action.orderIds, `Carga ${load.id} formada.`),
       };
     }
 
@@ -85,6 +131,11 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         loads: state.loads.map((l) => (l.id === load.id ? { ...l, status: "Contratada", shipmentId: shipment.id } : l)),
         vehicles: state.vehicles.map((v) => (v.id === vehicle?.id ? { ...v, status: "Em Viagem" } : v)),
         drivers: state.drivers.map((d) => (d.id === driver?.id ? { ...d, status: "Em Viagem" } : d)),
+        orderEvents: withEvents(
+          state.orderEvents,
+          load.orderIds,
+          `Transportadora selecionada (${action.option.label}) · Frete confirmado: R$ ${action.option.price.toLocaleString("pt-BR")} · Viagem ${shipment.id} criada.`
+        ),
       };
     }
 
@@ -99,6 +150,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         orders: state.orders.map((o) =>
           load?.orderIds.includes(o.id) ? { ...o, status: "Em transporte" } : o
         ),
+        orderEvents: withEvents(state.orderEvents, load?.orderIds ?? [], "Viagem iniciada — em trânsito."),
       };
     }
 
@@ -124,6 +176,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         orders: state.orders.map((o) =>
           load?.orderIds.includes(o.id) ? { ...o, status: "Com ocorrência" } : o
         ),
+        orderEvents: withEvents(state.orderEvents, load?.orderIds ?? [], `Ocorrência registrada: ${action.occurrenceType}.`),
       };
     }
 
@@ -144,6 +197,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         orders: state.orders.map((o) =>
           load?.orderIds.includes(o.id) ? { ...o, status: "Em transporte" } : o
         ),
+        orderEvents: withEvents(state.orderEvents, load?.orderIds ?? [], `Ocorrência resolvida: ${action.action}.`),
       };
     }
 
@@ -183,6 +237,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         documents: [...state.documents, ...newDocuments],
         vehicles: state.vehicles.map((v) => (v.id === shipment.vehicleId ? { ...v, status: "Disponível" } : v)),
         drivers: state.drivers.map((d) => (d.id === shipment.driverId ? { ...d, status: "Disponível" } : d)),
+        orderEvents: withEvents(state.orderEvents, load.orderIds, "Entrega realizada — POD simulado gerado."),
       };
     }
 
@@ -193,10 +248,12 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
 
 export function toastForAction(action: SimulationAction): string {
   switch (action.type) {
+    case "CREATE_ORDER":
+      return "Pedido criado e enviado para a fila de planejamento.";
     case "CREATE_LOAD":
       return "Carga criada e pedidos associados.";
     case "CREATE_SHIPMENT":
-      return "Viagem criada com transporte contratado.";
+      return "Contratação confirmada — viagem criada.";
     case "START_SHIPMENT":
       return "Viagem iniciada — em trânsito.";
     case "CREATE_OCCURRENCE":

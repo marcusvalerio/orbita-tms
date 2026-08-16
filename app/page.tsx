@@ -37,14 +37,14 @@ export default function OverviewPage() {
   const recentActivity = getRecentActivity(data);
 
   return (
-    <>
+    <div className="h-full flex flex-col">
       <WorkspaceHeader
         section="Atlas Distribuição · Sudeste"
-        title="Overview"
+        title="Visão Operacional"
         meta="O que está acontecendo na operação, agora."
       />
-      <div className="px-6 md:px-10 py-6 space-y-8">
-        <Section title="Operation Status">
+      <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 space-y-8">
+        <Section title="Status da Operação">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <MiniStat label="Pedidos" value={metrics.orderCount} />
             <MiniStat label="Cargas" value={metrics.loadCount} />
@@ -66,7 +66,7 @@ export default function OverviewPage() {
         </Section>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Section title="Active Shipments" href="/shipments" count={activeShipments.length}>
+          <Section title="Viagens Ativas" href="/shipments" count={activeShipments.length}>
             <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
               {activeShipments.length === 0 && <EmptyRow text="Nenhuma viagem ativa no momento." />}
               {activeShipments.map(({ shipment, origin, destination, carrierName }) => (
@@ -87,9 +87,9 @@ export default function OverviewPage() {
             </div>
           </Section>
 
-          <Section title="Exceptions" count={exceptions.length}>
+          <Section title="Ocorrências em Aberto" count={exceptions.length}>
             <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
-              {exceptions.length === 0 && <EmptyRow text="Nenhuma exceção em aberto." />}
+              {exceptions.length === 0 && <EmptyRow text="Nenhuma ocorrência em aberto." />}
               {exceptions.map(({ occurrence, shipment }) => (
                 <Link
                   key={occurrence.id}
@@ -106,24 +106,24 @@ export default function OverviewPage() {
             </div>
           </Section>
 
-          <Section title="Planning Queue" href="/planning" count={ordersAwaiting.length + loadsAwaitingCarrier.length}>
+          <Section title="Fila de Planejamento" href="/planning" count={ordersAwaiting.length + loadsAwaitingCarrier.length}>
             <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3 space-y-2">
               <QueueRow label="Pedidos aguardando planejamento" value={ordersAwaiting.length} />
               <QueueRow label="Cargas aguardando contratação" value={loadsAwaitingCarrier.length} />
             </div>
           </Section>
 
-          <Section title="Performance">
+          <Section title="Desempenho">
             <div className="grid grid-cols-2 gap-3">
               <MiniStat label="OTIF" value={metrics.otifPercent} suffix="%" />
               <MiniStat label="OTD" value={metrics.otdPercent} suffix="%" />
-              <MiniStat label="Ocupação" value={metrics.occupancyPercent} suffix="%" />
-              <MiniStat label="Custo/entrega" value={`R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`} />
+              <MiniStat label="Taxa de Ocupação" value={metrics.occupancyPercent} suffix="%" />
+              <MiniStat label="Custo por Entrega" value={`R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`} />
             </div>
           </Section>
         </div>
 
-        <Section title="Recent Activity">
+        <Section title="Atividade Recente">
           <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
             {recentActivity.length === 0 && <EmptyRow text="Nenhuma atividade recente." />}
             {recentActivity.map((event) => (
@@ -135,7 +135,7 @@ export default function OverviewPage() {
           </div>
         </Section>
       </div>
-    </>
+    </div>
   );
 }
 

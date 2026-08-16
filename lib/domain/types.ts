@@ -302,4 +302,12 @@ export interface OperationDataset {
   freights: Freight[];
   documents: TmsDocument[];
   kpiHistory: KpiSnapshot[];
+  orderEvents: OrderEvent[];
+}
+
+export interface OrderEvent {
+  id: ID;
+  orderId: ID;
+  message: string;
+  timestamp: string;
 }

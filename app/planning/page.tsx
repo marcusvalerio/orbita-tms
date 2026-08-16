@@ -17,8 +17,8 @@ function PlanningPageInner() {
   return (
     <>
       <WorkspaceHeader
-        section="Planning"
-        title="Planning"
+        section="Planejamento"
+        title="Planejamento de Transporte"
         meta={<span className="tabular">{ordersAwaiting.length} pedidos aguardando planejamento</span>}
       />
       <PlanningWorkspace
@@ -34,8 +34,10 @@ function PlanningPageInner() {
 
 export default function PlanningPage() {
   return (
-    <Suspense fallback={null}>
-      <PlanningPageInner />
-    </Suspense>
+    <div className="h-full flex flex-col">
+      <Suspense fallback={null}>
+        <PlanningPageInner />
+      </Suspense>
+    </div>
   );
 }

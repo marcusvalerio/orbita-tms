@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { OperationDataset, OccurrenceType, OccurrenceAction } from "@/lib/domain/types";
 import { generateAtlasOperation } from "@/lib/sim/generate-atlas";
-import { reduce, toastForAction, type SimulationAction } from "@/lib/sim/reducer";
+import { reduce, toastForAction, type SimulationAction, type NewOrderInput } from "@/lib/sim/reducer";
 import type { TransportOptionQuote } from "@/lib/planning/quote";
 
 interface Toast {
@@ -13,6 +13,7 @@ interface Toast {
 
 interface SimulationContextValue {
   data: OperationDataset;
+  createOrder: (input: NewOrderInput) => void;
   createLoad: (orderIds: string[]) => void;
   createShipment: (loadId: string, option: TransportOptionQuote) => void;
   startShipment: (shipmentId: string) => void;
@@ -46,6 +47,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
+  const createOrder = useCallback((input: NewOrderInput) => dispatch({ type: "CREATE_ORDER", input }), [dispatch]);
   const createLoad = useCallback((orderIds: string[]) => dispatch({ type: "CREATE_LOAD", orderIds }), [dispatch]);
   const createShipment = useCallback(
     (loadId: string, option: TransportOptionQuote) => dispatch({ type: "CREATE_SHIPMENT", loadId, option }),
@@ -81,6 +83,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     <SimulationContext.Provider
       value={{
         data,
+        createOrder,
         createLoad,
         createShipment,
         startShipment,

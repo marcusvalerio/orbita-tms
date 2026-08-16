@@ -8,7 +8,7 @@ import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { OccurrenceType, OccurrenceAction } from "@/lib/domain/types";
 
-const TIMELINE_STAGES = ["Planned", "Pickup", "In Transit", "At Delivery", "Delivered"] as const;
+const TIMELINE_STAGES = ["Planejada", "Coleta", "Em Trânsito", "Em Entrega", "Entregue"] as const;
 
 function stageIndexForStatus(status: string): number {
   switch (status) {
@@ -55,14 +55,14 @@ export default function ShipmentDetailPage() {
 
   if (!shipment) {
     return (
-      <>
-        <WorkspaceHeader section="Operations" title="Shipment não encontrada" />
+      <div className="h-full flex flex-col">
+        <WorkspaceHeader section="Operações" title="Viagem não encontrada" />
         <div className="px-6 md:px-10 py-6">
           <Link href="/shipments" className="text-sm text-blue-opal hover:underline">
-            ← Voltar para Shipments
+            ← Voltar para Viagens
           </Link>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -80,9 +80,9 @@ export default function ShipmentDetailPage() {
   const stageIndex = stageIndexForStatus(shipment.status);
 
   return (
-    <>
+    <div className="h-full flex flex-col">
       <WorkspaceHeader
-        section="Operations · Shipments"
+        section="Operações · Viagens"
         title={shipment.id}
         meta={
           <span>
@@ -92,11 +92,11 @@ export default function ShipmentDetailPage() {
         actions={<StatusBadge status={shipment.status} />}
       />
 
-      <div className="px-6 md:px-10 py-6 max-w-4xl space-y-8">
+      <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 max-w-4xl space-y-8">
         {/* TIMELINE */}
         <section>
           <h2 className="font-display font-semibold text-sm uppercase tracking-wider text-cosmic-ink/50 mb-4">
-            Timeline
+            Linha do Tempo
           </h2>
           <ol className="flex items-center gap-1">
             {TIMELINE_STAGES.map((stage, i) => {
@@ -132,7 +132,7 @@ export default function ShipmentDetailPage() {
                 onClick={() => startShipment(shipment.id)}
                 className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
               >
-                Start Shipment
+                Iniciar Viagem
               </button>
             )}
             {(shipment.status === "In Transit" || shipment.status === "At Delivery") && !unresolvedOccurrence && (
@@ -140,7 +140,7 @@ export default function ShipmentDetailPage() {
                 onClick={() => completeDelivery(shipment.id)}
                 className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
               >
-                Complete Delivery
+                Concluir Entrega
               </button>
             )}
             {(shipment.status === "In Transit" || shipment.status === "At Delivery") && !unresolvedOccurrence && (
@@ -148,7 +148,7 @@ export default function ShipmentDetailPage() {
                 onClick={() => setShowOccurrenceForm((v) => !v)}
                 className="rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium px-4 py-2 hover:bg-cosmic-ink/5 transition-colors"
               >
-                Create Occurrence
+                Registrar Ocorrência
               </button>
             )}
           </div>
@@ -156,10 +156,10 @@ export default function ShipmentDetailPage() {
 
         {/* DETAILS */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <DetailField label="Vehicle" value={vehicle ? `${vehicle.id} · ${vehicle.type}` : "—"} />
-          <DetailField label="Driver" value={driver?.name ?? "—"} />
-          <DetailField label="Carrier" value={carrier?.name ?? "Frota Própria"} />
-          <DetailField label="Load" value={load?.id ?? "—"} />
+          <DetailField label="Veículo" value={vehicle ? `${vehicle.id} · ${vehicle.type}` : "—"} />
+          <DetailField label="Motorista responsável" value={driver?.name ?? "—"} />
+          <DetailField label="Transportadora" value={carrier?.name ?? "Frota Própria"} />
+          <DetailField label="Carga" value={load?.id ?? "—"} />
         </section>
 
         {/* OCCURRENCE FORM */}
@@ -186,7 +186,7 @@ export default function ShipmentDetailPage() {
         {/* EXCEPTIONS */}
         <section>
           <h2 className="font-display font-semibold text-sm uppercase tracking-wider text-cosmic-ink/50 mb-3">
-            Exceptions
+            Ocorrências
           </h2>
           {occurrences.length === 0 ? (
             <p className="text-sm text-cosmic-ink/45">Nenhuma ocorrência registrada nesta viagem.</p>
@@ -197,7 +197,7 @@ export default function ShipmentDetailPage() {
                   <div className="flex items-center justify-between">
                     <p className="font-display font-medium text-sm text-cosmic-ink">{occurrence.type}</p>
                     <span className={`text-xs font-medium ${occurrence.resolved ? "text-emerald-700" : "text-cinnamon"}`}>
-                      {occurrence.resolved ? `Resolvida · ${occurrence.action}` : "Open"}
+                      {occurrence.resolved ? `Resolvida · ${occurrence.action}` : "Em Aberto"}
                     </span>
                   </div>
                   {!occurrence.resolved && (
@@ -244,7 +244,7 @@ export default function ShipmentDetailPage() {
           </div>
         </section>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SimulationProvider } from "@/components/simulation/SimulationProvider";
 import { ToastStack } from "@/components/simulation/ToastStack";
+import { TopBar } from "@/components/simulation/TopBar";
 
 // Roobert é uma fonte licenciada (Displaay Type Foundry) e não está disponível
 // via Google Fonts/npm. Usamos Inter como substituto provisório com a mesma
@@ -23,7 +24,7 @@ const roobertStandIn = Inter({
 
 export const metadata: Metadata = {
   title: "ÓRBITA TMS",
-  description: "Transportation Management System — simulação operacional",
+  description: "Sistema de Gestão de Transporte (TMS) — simulação operacional",
 };
 
 export default function RootLayout({
@@ -37,7 +38,10 @@ export default function RootLayout({
         <SimulationProvider>
           <div className="flex h-screen overflow-hidden">
             <Sidebar />
-            <main className="flex-1 min-w-0 h-screen overflow-y-auto">{children}</main>
+            <div className="flex-1 min-w-0 h-screen flex flex-col">
+              <TopBar />
+              <main className="flex-1 min-w-0 overflow-hidden flex flex-col">{children}</main>
+            </div>
           </div>
           <ToastStack />
         </SimulationProvider>

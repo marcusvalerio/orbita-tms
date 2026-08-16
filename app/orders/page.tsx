@@ -24,10 +24,10 @@ export default function OrdersPage() {
   const completed = orders.filter((o) => o.status === "Entregue").length;
 
   return (
-    <>
+    <div className="h-full flex flex-col">
       <WorkspaceHeader
-        section="Operations"
-        title="Orders"
+        section="Operações"
+        title="Pedidos"
         meta={
           <span className="tabular">
             {orders.length} total · {awaitingPlanning} aguardando planejamento · {planned} planejados ·{" "}
@@ -41,7 +41,8 @@ export default function OrdersPage() {
         customerById={customerById}
         loadByOrderId={loadByOrderId}
         shipmentByLoadId={shipmentByLoadId}
+        orderEvents={data.orderEvents}
       />
-    </>
+    </div>
   );
 }

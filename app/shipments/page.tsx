@@ -15,13 +15,13 @@ export default function ShipmentsPage() {
   );
 
   return (
-    <>
+    <div className="h-full flex flex-col">
       <WorkspaceHeader
-        section="Operations"
-        title="Shipments"
+        section="Operações"
+        title="Viagens"
         meta={<span className="tabular">{shipments.length} viagens na operação</span>}
       />
-      <div className="px-6 md:px-10 py-6">
+      <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6">
         <div className="overflow-x-auto rounded-lg border border-cosmic-ink/10 bg-white/60">
           <table className="w-full text-sm">
             <thead>
@@ -30,7 +30,7 @@ export default function ShipmentsPage() {
                 <th className="px-4 py-3 font-medium">Rota</th>
                 <th className="px-4 py-3 font-medium">Transportadora</th>
                 <th className="px-4 py-3 font-medium">Carga</th>
-                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Situação</th>
               </tr>
             </thead>
             <tbody>
@@ -67,6 +67,6 @@ export default function ShipmentsPage() {
           </table>
         </div>
       </div>
-    </>
+    </div>
   );
 }

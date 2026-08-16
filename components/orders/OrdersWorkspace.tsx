@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Order, Location, Customer, Load, Shipment } from "@/lib/domain/types";
+import type { Order, Location, Customer, Load, Shipment, OrderEvent } from "@/lib/domain/types";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
-const LIFECYCLE_STAGES = ["Created", "Validated", "Planning", "Load", "Shipment", "Delivery"] as const;
+const LIFECYCLE_STAGES = ["Criado", "Validado", "Planejamento", "Carga", "Embarque", "Entrega"] as const;
 
 function stageIndexForOrder(order: Order, hasLoad: boolean, hasShipment: boolean): number {
   if (order.status === "Entregue") return 5;
@@ -20,24 +20,30 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
 export function OrdersWorkspace({
   orders,
   locationById,
   customerById,
   loadByOrderId,
   shipmentByLoadId,
+  orderEvents,
 }: {
   orders: Order[];
   locationById: Map<string, Location>;
   customerById: Map<string, Customer>;
   loadByOrderId: Map<string, Load>;
   shipmentByLoadId: Map<string, Shipment>;
+  orderEvents: OrderEvent[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = orders.find((o) => o.id === selectedId) ?? null;
 
   return (
-    <div className="flex h-[calc(100vh-73px)] overflow-hidden">
+    <div className="flex flex-1 min-h-0 overflow-hidden">
       <div className="flex-1 min-w-0 overflow-y-auto">
         <div className="overflow-x-auto rounded-lg border border-cosmic-ink/10 bg-white/60 m-6 md:m-10">
           <table className="w-full text-sm">
@@ -48,7 +54,7 @@ export function OrdersWorkspace({
                 <th className="px-4 py-3 font-medium">Peso</th>
                 <th className="px-4 py-3 font-medium">Prazo</th>
                 <th className="px-4 py-3 font-medium">Prioridade</th>
-                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Situação</th>
               </tr>
             </thead>
             <tbody>
@@ -102,6 +108,7 @@ export function OrdersWorkspace({
               ? shipmentByLoadId.get(loadByOrderId.get(selected.id)!.id)
               : undefined
           }
+          events={orderEvents.filter((e) => e.orderId === selected.id)}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -116,6 +123,7 @@ function OrderDetailPanel({
   customer,
   load,
   shipment,
+  events,
   onClose,
 }: {
   order: Order;
@@ -124,15 +132,17 @@ function OrderDetailPanel({
   customer?: Customer;
   load?: Load;
   shipment?: Shipment;
+  events: OrderEvent[];
   onClose: () => void;
 }) {
   const stageIndex = stageIndexForOrder(order, !!load, !!shipment);
+  const sortedEvents = [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   return (
     <aside className="w-full max-w-sm shrink-0 border-l border-cosmic-ink/10 bg-white/70 overflow-y-auto">
       <div className="px-6 py-5 border-b border-cosmic-ink/10 flex items-start justify-between">
         <div>
-          <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-1">Order Workspace</p>
+          <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-1">Detalhes do Pedido</p>
           <h2 className="font-display font-semibold text-lg text-cosmic-ink">{order.id}</h2>
           <p className="text-sm text-cosmic-ink/60 mt-0.5">{customer?.name ?? "Cliente"}</p>
         </div>
@@ -149,12 +159,12 @@ function OrderDetailPanel({
         <p className="text-sm text-cosmic-ink/80 mb-3">
           {origin?.city} → {destination?.city}
         </p>
-        <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-2">Status atual</p>
+        <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-2">Situação atual</p>
         <StatusBadge status={order.status} />
       </div>
 
       <div className="px-6 py-5 border-b border-cosmic-ink/10">
-        <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-3">Order Lifecycle</p>
+        <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-3">Ciclo de Vida do Pedido</p>
         <ol className="space-y-2">
           {LIFECYCLE_STAGES.map((stage, i) => {
             const isDone = i < stageIndex;
@@ -193,8 +203,22 @@ function OrderDetailPanel({
         <DetailField label="Prioridade" value={order.priority} />
         <DetailField label="Prazo" value={formatDate(order.dueDate)} />
         {load && <DetailField label="Carga" value={load.id} />}
-        {shipment && <DetailField label="Viagem" value={shipment.id} />}
+        {shipment && <DetailField label="Embarque" value={shipment.id} />}
       </div>
+
+      {sortedEvents.length > 0 && (
+        <div className="px-6 py-5 border-b border-cosmic-ink/10">
+          <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-3">Histórico</p>
+          <ol className="space-y-3">
+            {sortedEvents.map((event) => (
+              <li key={event.id} className="text-sm">
+                <p className="text-cosmic-ink/40 text-xs tabular">{formatDateTime(event.timestamp)}</p>
+                <p className="text-cosmic-ink/80">{event.message}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {order.status === "Aguardando planejamento" && (
         <div className="px-6 py-5">
@@ -207,7 +231,7 @@ function OrderDetailPanel({
             href={`/shipments/${shipment.id}`}
             className="block w-full text-center rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2.5 hover:bg-cosmic-ink/5 transition-colors"
           >
-            Ver Viagem {shipment.id}
+            Ver Embarque {shipment.id}
           </Link>
         </div>
       )}
@@ -222,7 +246,7 @@ function PlanTransportButton({ orderId }: { orderId: string }) {
       onClick={() => router.push(`/planning?order=${orderId}`)}
       className="w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors"
     >
-      Plan Transport
+      Planejar Transporte
     </button>
   );
 }
