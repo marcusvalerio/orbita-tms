@@ -303,6 +303,7 @@ export interface OperationDataset {
   documents: TmsDocument[];
   kpiHistory: KpiSnapshot[];
   orderEvents: OrderEvent[];
+  counters: EntityCounters;
 }
 
 export interface OrderEvent {
@@ -310,4 +311,16 @@ export interface OrderEvent {
   orderId: ID;
   message: string;
   timestamp: string;
+}
+
+/** Contadores sequenciais persistentes — origem dos identificadores como PED-00001, CAR-00001 etc. */
+export interface EntityCounters {
+  order: number;
+  load: number;
+  shipment: number;
+  delivery: number;
+  occurrence: number;
+  document: number;
+  pod: number;
+  event: number;
 }

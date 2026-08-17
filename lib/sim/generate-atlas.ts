@@ -101,9 +101,14 @@ function isoDaysFromNow(days: number, hour = 8, minute = 0): string {
 // Geração principal
 // ---------------------------------------------------------------------------
 
-export function generateAtlasOperation(): OperationDataset {
-  const rng = createRng(SEED);
-
+/**
+ * Dados de referência (cadastros): localidades, clientes, produtos, frota,
+ * motoristas e transportadoras. Representam a infraestrutura da operação —
+ * não fazem parte do que "Reiniciar Simulação" apaga, pois não são
+ * movimentações, e por isso ficam disponíveis tanto para a operação vazia
+ * quanto para o cenário de demonstração.
+ */
+export function generateReferenceData(rng: () => number) {
   const company: Company = {
     id: "atlas",
     name: "Atlas Distribuição",
@@ -135,7 +140,6 @@ export function generateAtlasOperation(): OperationDataset {
       lng: c.lng,
     });
   });
-  const cds = locations.filter((l) => l.kind === "CD");
   const clientLocations = locations.filter((l) => l.kind === "Cliente");
 
   // --- Customers --------------------------------------------------------
@@ -193,6 +197,16 @@ export function generateAtlasOperation(): OperationDataset {
     avgCostPerKm: floatBetween(rng, 1.4, 3.2, 2),
     occurrenceRate: floatBetween(rng, 0.02, 0.18, 2),
   }));
+
+  return { company, locations, customers, products, vehicles, drivers, carriers };
+}
+
+export function generateAtlasOperation(): OperationDataset {
+  const rng = createRng(SEED);
+
+  const { company, locations, customers, products, vehicles, drivers, carriers } = generateReferenceData(rng);
+  const cds = locations.filter((l) => l.kind === "CD");
+  const clientLocations = locations.filter((l) => l.kind === "Cliente");
 
   // --- Orders -------------------------------------------------------------
   const orderStatusPool: OrderStatus[] = [
@@ -562,5 +576,6 @@ export function generateAtlasOperation(): OperationDataset {
     documents,
     kpiHistory,
     orderEvents: [],
+    counters: { order: 1, load: 1, shipment: 1, delivery: 1, occurrence: 1, document: 1, pod: 1, event: 1 },
   };
 }

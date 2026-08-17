@@ -12,6 +12,8 @@ import {
 } from "@/lib/data/atlas";
 import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { NewOrderModal } from "@/components/simulation/NewOrderModal";
+import { useState } from "react";
 
 const SEVERITY_STYLES: Record<string, string> = {
   info: "border-blue-opal/20 bg-blue-opal/5 text-blue-opal",
@@ -28,7 +30,8 @@ function timeAgo(iso: string) {
 }
 
 export default function OverviewPage() {
-  const { data } = useSimulation();
+  const { data, isEmpty, loadDemoScenario } = useSimulation();
+  const [showNewOrder, setShowNewOrder] = useState(false);
   const metrics = getOverviewMetrics(data);
   const alerts = getOperationalAlerts(data);
   const activeShipments = getActiveShipments(data);
@@ -44,6 +47,29 @@ export default function OverviewPage() {
         meta="O que está acontecendo na operação, agora."
       />
       <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 space-y-8">
+        {isEmpty && (
+          <div className="rounded-lg border border-dashed border-cosmic-ink/20 bg-white/40 px-6 py-8 text-center">
+            <p className="font-display font-semibold text-cosmic-ink mb-1">Nenhuma operação em andamento.</p>
+            <p className="text-sm text-cosmic-ink/55 mb-5">
+              Comece criando o primeiro pedido — ele entra automaticamente na fila de planejamento.
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setShowNewOrder(true)}
+                className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
+              >
+                + Novo Pedido
+              </button>
+              <button
+                onClick={loadDemoScenario}
+                className="rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium px-4 py-2 hover:bg-cosmic-ink/5 transition-colors"
+              >
+                Carregar Cenário de Demonstração
+              </button>
+            </div>
+          </div>
+        )}
+
         <Section title="Status da Operação">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <MiniStat label="Pedidos" value={metrics.orderCount} />
@@ -118,7 +144,7 @@ export default function OverviewPage() {
               <MiniStat label="OTIF" value={metrics.otifPercent} suffix="%" />
               <MiniStat label="OTD" value={metrics.otdPercent} suffix="%" />
               <MiniStat label="Taxa de Ocupação" value={metrics.occupancyPercent} suffix="%" />
-              <MiniStat label="Custo por Entrega" value={`R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`} />
+              <MiniStat label="Custo por Entrega" value={metrics.costPerDelivery === null ? null : `R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`} />
             </div>
           </Section>
         </div>
@@ -135,6 +161,7 @@ export default function OverviewPage() {
           </div>
         </Section>
       </div>
+      {showNewOrder && <NewOrderModal onClose={() => setShowNewOrder(false)} />}
     </div>
   );
 }
@@ -170,13 +197,22 @@ function Section({
   );
 }
 
-function MiniStat({ label, value, suffix }: { label: string; value: string | number; suffix?: string }) {
+function MiniStat({
+  label,
+  value,
+  suffix,
+}: {
+  label: string;
+  value: string | number | null;
+  suffix?: string;
+}) {
+  const isEmpty = value === null;
   return (
     <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3">
       <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/50 mb-1">{label}</p>
-      <p className="font-display font-semibold text-2xl tabular text-cosmic-ink">
-        {value}
-        {suffix && <span className="text-base font-medium ml-0.5">{suffix}</span>}
+      <p className={`font-display font-semibold text-2xl tabular ${isEmpty ? "text-cosmic-ink/30" : "text-cosmic-ink"}`}>
+        {isEmpty ? "—" : value}
+        {!isEmpty && suffix && <span className="text-base font-medium ml-0.5">{suffix}</span>}
       </p>
     </div>
   );

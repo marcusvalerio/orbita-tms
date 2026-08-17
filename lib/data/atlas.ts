@@ -5,27 +5,28 @@ export interface OverviewMetrics {
   loadCount: number;
   shipmentCount: number;
   deliveryCount: number;
-  otifPercent: number;
-  otdPercent: number;
-  occupancyPercent: number;
-  costPerDelivery: number;
+  otifPercent: number | null;
+  otdPercent: number | null;
+  occupancyPercent: number | null;
+  costPerDelivery: number | null;
   normalCount: number;
   attentionCount: number;
   occurrenceCount: number;
 }
 
-/** Todos os KPIs são derivados do estado atual — nunca hardcoded. */
+/** Todos os KPIs são derivados do estado atual — nunca hardcoded. Sem movimentação real, o indicador é `null` ("—" na interface), nunca um número decorativo. */
 export function getOverviewMetrics(data: OperationDataset): OverviewMetrics {
   const deliveredCount = data.deliveries.filter((d) => d.result === "Delivered").length;
   const totalDeliveries = data.deliveries.length;
-  const otifPercent = totalDeliveries > 0 ? Math.round((deliveredCount / totalDeliveries) * 1000) / 10 : 100;
+  const otifPercent = totalDeliveries > 0 ? Math.round((deliveredCount / totalDeliveries) * 1000) / 10 : null;
   const otdPercent = otifPercent;
 
   const totalCapacity = data.vehicles.reduce((s, v) => s + v.capacityKg, 0) || 1;
   const totalLoadWeight = data.loads.reduce((s, l) => s + l.totalWeightKg, 0);
-  const occupancyPercent = Math.min(100, Math.round((totalLoadWeight / (totalCapacity * 0.3)) * 1000) / 10);
+  const occupancyPercent =
+    data.loads.length > 0 ? Math.min(100, Math.round((totalLoadWeight / (totalCapacity * 0.3)) * 1000) / 10) : null;
 
-  const costPerDelivery = deliveredCount > 0 ? Math.round((totalLoadWeight * 0.8) / deliveredCount) : 0;
+  const costPerDelivery = deliveredCount > 0 ? Math.round((totalLoadWeight * 0.8) / deliveredCount) : null;
 
   const shipmentsWithOpenOccurrence = data.shipments.filter((s) =>
     s.occurrenceIds.some((occId) => data.occurrences.find((o) => o.id === occId && !o.resolved))

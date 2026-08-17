@@ -16,11 +16,17 @@ interface SearchGroup {
   results: SearchResult[];
 }
 
-export function GlobalSearch() {
+export function GlobalSearch({
+  autoFocus,
+  onNavigate,
+}: {
+  autoFocus?: boolean;
+  onNavigate?: () => void;
+} = {}) {
   const { data } = useSimulation();
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(!!autoFocus);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const customerById = useMemo(() => new Map(data.customers.map((c) => [c.id, c])), [data.customers]);
@@ -70,6 +76,7 @@ export function GlobalSearch() {
     setQuery("");
     setFocused(false);
     inputRef.current?.blur();
+    onNavigate?.();
   };
 
   const hasResults = groups.length > 0;

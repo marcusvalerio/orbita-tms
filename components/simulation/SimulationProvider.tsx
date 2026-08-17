@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { OperationDataset, OccurrenceType, OccurrenceAction } from "@/lib/domain/types";
+import { generateEmptyOperation } from "@/lib/sim/generate-empty";
 import { generateAtlasOperation } from "@/lib/sim/generate-atlas";
 import { reduce, toastForAction, type SimulationAction, type NewOrderInput } from "@/lib/sim/reducer";
 import { loadPersistedState, persistState, clearPersistedState } from "@/lib/sim/persistence";
@@ -14,6 +15,7 @@ interface Toast {
 
 interface SimulationContextValue {
   data: OperationDataset;
+  isEmpty: boolean;
   createOrder: (input: NewOrderInput) => void;
   createLoad: (orderIds: string[]) => void;
   createShipment: (loadId: string, option: TransportOptionQuote) => void;
@@ -22,6 +24,7 @@ interface SimulationContextValue {
   resolveOccurrence: (occurrenceId: string, action: OccurrenceAction) => void;
   completeDelivery: (shipmentId: string) => void;
   resetSimulation: () => void;
+  loadDemoScenario: () => void;
   toasts: Toast[];
 }
 
@@ -31,19 +34,20 @@ let toastSeq = 0;
 
 export function SimulationProvider({ children }: { children: React.ReactNode }) {
   // UMA ÚNICA FONTE DE VERDADE: este provider vive no layout raiz e é
-  // instanciado uma única vez por carregamento de página. Toda navegação
-  // dentro do app (via next/link ou router.push) reutiliza esta mesma
-  // árvore de componentes — o estado nunca é recriado por navegação.
-  // Nasce nulo em server e client (evita mismatch de hidratação, já que a
-  // geração usa timestamps atuais) e é populado só no client após o mount,
-  // priorizando o estado salvo em localStorage quando existir.
+  // instanciado uma única vez por carregamento de página. O estado inicial
+  // real do ÓRBITA é uma operação vazia — só os cadastros (frota,
+  // transportadoras, clientes) vêm pré-carregados; pedidos, cargas, viagens,
+  // entregas, ocorrências e documentos nascem exclusivamente da ação da
+  // pessoa usuária. Nasce nulo em server e client (evita mismatch de
+  // hidratação) e é populado só no client após o mount, priorizando o
+  // estado salvo em localStorage quando existir.
   const [data, setData] = useState<OperationDataset | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const hydrated = useRef(false);
 
   useEffect(() => {
     const persisted = loadPersistedState();
-    setData(persisted ?? generateAtlasOperation());
+    setData(persisted ?? generateEmptyOperation());
     hydrated.current = true;
   }, []);
 
@@ -93,8 +97,13 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
 
   const resetSimulation = useCallback(() => {
     clearPersistedState();
+    setData(generateEmptyOperation());
+    pushToast("Simulação reiniciada — operação restaurada para o estado inicial (zero).");
+  }, [pushToast]);
+
+  const loadDemoScenario = useCallback(() => {
     setData(generateAtlasOperation());
-    pushToast("Simulação reiniciada — dados iniciais restaurados.");
+    pushToast("Cenário de demonstração carregado.");
   }, [pushToast]);
 
   if (!data) {
@@ -105,10 +114,13 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     );
   }
 
+  const isEmpty = data.orders.length === 0 && data.loads.length === 0 && data.shipments.length === 0;
+
   return (
     <SimulationContext.Provider
       value={{
         data,
+        isEmpty,
         createOrder,
         createLoad,
         createShipment,
@@ -117,6 +129,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
         resolveOccurrence,
         completeDelivery,
         resetSimulation,
+        loadDemoScenario,
         toasts,
       }}
     >

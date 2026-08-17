@@ -10,6 +10,7 @@ import type {
   Delivery,
   TmsDocument,
   OrderEvent,
+  EntityCounters,
 } from "../domain/types";
 import type { TransportOptionQuote } from "../planning/quote";
 
@@ -31,31 +32,45 @@ export type SimulationAction =
   | { type: "RESOLVE_OCCURRENCE"; occurrenceId: string; action: OccurrenceAction }
   | { type: "COMPLETE_DELIVERY"; shipmentId: string };
 
-let seq = 900; // contador de IDs para novas entidades criadas na sessão
-
-function nextId(prefix: string, pad = 5) {
-  seq += 1;
-  return `${prefix}-${seq.toString().padStart(pad, "0")}`;
+/** Gera o próximo ID sequencial de um tipo de entidade e retorna os contadores atualizados. */
+function takeId(counters: EntityCounters, key: keyof EntityCounters, prefix: string): [string, EntityCounters] {
+  const n = counters[key];
+  const id = `${prefix}-${n.toString().padStart(5, "0")}`;
+  return [id, { ...counters, [key]: n + 1 }];
 }
 
-function withEvents(events: OrderEvent[], orderIds: string[], message: string): OrderEvent[] {
+function withEvents(
+  events: OrderEvent[],
+  counters: EntityCounters,
+  orderIds: string[],
+  message: string
+): [OrderEvent[], EntityCounters] {
   const now = new Date().toISOString();
-  const newEvents = orderIds.map((orderId) => ({ id: nextId("evt", 4), orderId, message, timestamp: now }));
-  return [...events, ...newEvents];
+  let c = counters;
+  const newEvents: OrderEvent[] = orderIds.map((orderId) => {
+    let id: string;
+    [id, c] = takeId(c, "event", "evt");
+    return { id, orderId, message, timestamp: now };
+  });
+  return [[...events, ...newEvents], c];
 }
 
 export function reduce(state: OperationDataset, action: SimulationAction): OperationDataset {
   switch (action.type) {
     case "CREATE_ORDER": {
       const { input } = action;
+      let counters = state.counters;
+      let orderId: string;
+      [orderId, counters] = takeId(counters, "order", "PED");
+
       const item: OrderItem = {
-        id: nextId("item", 4),
+        id: `${orderId}-item-1`,
         productId: "prod-01",
         quantity: 1,
         weightKg: input.totalWeightKg,
       };
       const order: Order = {
-        id: nextId("PED"),
+        id: orderId,
         originId: input.originId,
         destinationId: input.destinationId,
         customerId: input.customerId,
@@ -66,10 +81,14 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         priority: input.priority,
         status: "Aguardando planejamento",
       };
+
+      const [orderEvents, counters2] = withEvents(state.orderEvents, counters, [order.id], "Pedido criado e enviado para planejamento.");
+
       return {
         ...state,
         orders: [...state.orders, order],
-        orderEvents: withEvents(state.orderEvents, [order.id], "Pedido criado e enviado para planejamento."),
+        orderEvents,
+        counters: counters2,
       };
     }
 
@@ -78,8 +97,13 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       if (orders.length === 0) return state;
       const totalWeightKg = orders.reduce((sum, o) => sum + o.totalWeightKg, 0);
       const totalVolumeM3 = Math.round(orders.reduce((sum, o) => sum + o.totalVolumeM3, 0) * 10) / 10;
+
+      let counters = state.counters;
+      let loadId: string;
+      [loadId, counters] = takeId(counters, "load", "CAR");
+
       const load: Load = {
-        id: nextId("LOAD"),
+        id: loadId,
         orderIds: orders.map((o) => o.id),
         originId: orders[0].originId,
         destinationId: orders[0].destinationId,
@@ -87,13 +111,17 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         totalVolumeM3,
         status: "Aguardando transporte",
       };
+
+      const [orderEvents, counters2] = withEvents(state.orderEvents, counters, action.orderIds, `Carga ${load.id} formada.`);
+
       return {
         ...state,
         loads: [...state.loads, load],
         orders: state.orders.map((o) =>
           action.orderIds.includes(o.id) ? { ...o, status: "Planejado", loadId: load.id } : o
         ),
-        orderEvents: withEvents(state.orderEvents, action.orderIds, `Carga ${load.id} formada.`),
+        orderEvents,
+        counters: counters2,
       };
     }
 
@@ -102,40 +130,47 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       if (!load) return state;
       const vehicle = state.vehicles.find((v) => v.status === "Disponível" && v.capacityKg >= load.totalWeightKg);
       const driver = state.drivers.find((d) => d.status === "Disponível");
+
+      let counters = state.counters;
+      let shipmentId: string;
+      [shipmentId, counters] = takeId(counters, "shipment", "VIA");
+
+      const departure = new Date().toISOString();
+      const eta = new Date(Date.now() + action.option.etaDays * 86400000).toISOString();
+
       const shipment: Shipment = {
-        id: nextId("SHIP", 6),
+        id: shipmentId,
         loadId: load.id,
         carrierId: action.option.isOwnFleet ? state.carriers[0]?.id ?? "own-fleet" : action.option.id,
         vehicleId: vehicle?.id ?? state.vehicles[0]?.id ?? "TRK-001",
         driverId: driver?.id ?? state.drivers[0]?.id ?? "driver-01",
         originId: load.originId,
         destinationId: load.destinationId,
-        departureTime: new Date().toISOString(),
-        etaTime: new Date(Date.now() + action.option.etaDays * 86400000).toISOString(),
+        departureTime: departure,
+        etaTime: eta,
         status: "Planned",
         stops: [
-          { id: nextId("stop", 4), locationId: load.originId, sequence: 1, kind: "Coleta", plannedTime: new Date().toISOString() },
-          {
-            id: nextId("stop", 4),
-            locationId: load.destinationId,
-            sequence: 2,
-            kind: "Entrega",
-            plannedTime: new Date(Date.now() + action.option.etaDays * 86400000).toISOString(),
-          },
+          { id: `${shipmentId}-stop-1`, locationId: load.originId, sequence: 1, kind: "Coleta", plannedTime: departure },
+          { id: `${shipmentId}-stop-2`, locationId: load.destinationId, sequence: 2, kind: "Entrega", plannedTime: eta },
         ],
         occurrenceIds: [],
       };
+
+      const [orderEvents, counters2] = withEvents(
+        state.orderEvents,
+        counters,
+        load.orderIds,
+        `Transportadora selecionada (${action.option.label}) · Frete confirmado: R$ ${action.option.price.toLocaleString("pt-BR")} · Viagem ${shipment.id} criada.`
+      );
+
       return {
         ...state,
         shipments: [...state.shipments, shipment],
         loads: state.loads.map((l) => (l.id === load.id ? { ...l, status: "Contratada", shipmentId: shipment.id } : l)),
         vehicles: state.vehicles.map((v) => (v.id === vehicle?.id ? { ...v, status: "Em Viagem" } : v)),
         drivers: state.drivers.map((d) => (d.id === driver?.id ? { ...d, status: "Em Viagem" } : d)),
-        orderEvents: withEvents(
-          state.orderEvents,
-          load.orderIds,
-          `Transportadora selecionada (${action.option.label}) · Frete confirmado: R$ ${action.option.price.toLocaleString("pt-BR")} · Viagem ${shipment.id} criada.`
-        ),
+        orderEvents,
+        counters: counters2,
       };
     }
 
@@ -143,6 +178,14 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       const shipment = state.shipments.find((s) => s.id === action.shipmentId);
       if (!shipment || shipment.status !== "Planned") return state;
       const load = state.loads.find((l) => l.id === shipment.loadId);
+
+      const [orderEvents, counters] = withEvents(
+        state.orderEvents,
+        state.counters,
+        load?.orderIds ?? [],
+        "Viagem iniciada — em trânsito."
+      );
+
       return {
         ...state,
         shipments: state.shipments.map((s) => (s.id === shipment.id ? { ...s, status: "In Transit" } : s)),
@@ -150,7 +193,8 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         orders: state.orders.map((o) =>
           load?.orderIds.includes(o.id) ? { ...o, status: "Em transporte" } : o
         ),
-        orderEvents: withEvents(state.orderEvents, load?.orderIds ?? [], "Viagem iniciada — em trânsito."),
+        orderEvents,
+        counters,
       };
     }
 
@@ -158,8 +202,13 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       const shipment = state.shipments.find((s) => s.id === action.shipmentId);
       if (!shipment) return state;
       const load = state.loads.find((l) => l.id === shipment.loadId);
+
+      let counters = state.counters;
+      let occurrenceId: string;
+      [occurrenceId, counters] = takeId(counters, "occurrence", "OCC");
+
       const occurrence: Occurrence = {
-        id: nextId("OCC", 4),
+        id: occurrenceId,
         shipmentId: shipment.id,
         type: action.occurrenceType,
         description: `${action.occurrenceType} registrado(a) durante a execução de ${shipment.id}.`,
@@ -167,6 +216,14 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         resolved: false,
         severity: "Média",
       };
+
+      const [orderEvents, counters2] = withEvents(
+        state.orderEvents,
+        counters,
+        load?.orderIds ?? [],
+        `Ocorrência registrada: ${action.occurrenceType}.`
+      );
+
       return {
         ...state,
         occurrences: [...state.occurrences, occurrence],
@@ -176,7 +233,8 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         orders: state.orders.map((o) =>
           load?.orderIds.includes(o.id) ? { ...o, status: "Com ocorrência" } : o
         ),
-        orderEvents: withEvents(state.orderEvents, load?.orderIds ?? [], `Ocorrência registrada: ${action.occurrenceType}.`),
+        orderEvents,
+        counters: counters2,
       };
     }
 
@@ -186,6 +244,14 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       const shipment = state.shipments.find((s) => s.id === occurrence.shipmentId);
       const load = shipment ? state.loads.find((l) => l.id === shipment.loadId) : undefined;
       const backToTransit = action.action === "Nova tentativa" || action.action === "Reagendar";
+
+      const [orderEvents, counters] = withEvents(
+        state.orderEvents,
+        state.counters,
+        load?.orderIds ?? [],
+        `Ocorrência resolvida: ${action.action}.`
+      );
+
       return {
         ...state,
         occurrences: state.occurrences.map((o) =>
@@ -197,7 +263,8 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         orders: state.orders.map((o) =>
           load?.orderIds.includes(o.id) ? { ...o, status: "Em transporte" } : o
         ),
-        orderEvents: withEvents(state.orderEvents, load?.orderIds ?? [], `Ocorrência resolvida: ${action.action}.`),
+        orderEvents,
+        counters,
       };
     }
 
@@ -208,14 +275,20 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       if (!load) return state;
       const now = new Date().toISOString();
 
+      let counters = state.counters;
       const newDeliveries: Delivery[] = [];
       const newDocuments: TmsDocument[] = [];
+
       load.orderIds.forEach((orderId) => {
         const order = state.orders.find((o) => o.id === orderId);
-        const podId = nextId("SIM", 6);
+        let deliveryId: string;
+        [deliveryId, counters] = takeId(counters, "delivery", "ENT");
+        let podId: string;
+        [podId, counters] = takeId(counters, "pod", "POD");
+
         newDocuments.push({ id: podId, type: "POD", shipmentId: shipment.id, simulated: true, issuedAt: now });
         newDeliveries.push({
-          id: nextId("deliv", 4),
+          id: deliveryId,
           shipmentId: shipment.id,
           orderId,
           customerId: order?.customerId ?? "",
@@ -228,6 +301,13 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         });
       });
 
+      const [orderEvents, counters2] = withEvents(
+        state.orderEvents,
+        counters,
+        load.orderIds,
+        "Entrega realizada — POD simulado gerado."
+      );
+
       return {
         ...state,
         shipments: state.shipments.map((s) => (s.id === shipment.id ? { ...s, status: "Delivered" } : s)),
@@ -237,7 +317,8 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
         documents: [...state.documents, ...newDocuments],
         vehicles: state.vehicles.map((v) => (v.id === shipment.vehicleId ? { ...v, status: "Disponível" } : v)),
         drivers: state.drivers.map((d) => (d.id === shipment.driverId ? { ...d, status: "Disponível" } : d)),
-        orderEvents: withEvents(state.orderEvents, load.orderIds, "Entrega realizada — POD simulado gerado."),
+        orderEvents,
+        counters: counters2,
       };
     }
 
