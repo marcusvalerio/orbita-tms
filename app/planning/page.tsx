@@ -19,7 +19,12 @@ function PlanningPageInner() {
       <WorkspaceHeader
         section="Planejamento"
         title="Planejamento de Transporte"
-        meta={<span className="tabular">{ordersAwaiting.length} pedidos aguardando planejamento</span>}
+        meta={
+          <span>
+            <span className="tabular">{ordersAwaiting.length} pedidos aguardando planejamento</span>
+            <span className="hidden md:inline"> · Analise, consolide e escolha a melhor alternativa de transporte.</span>
+          </span>
+        }
       />
       <PlanningWorkspace
         orders={ordersAwaiting}

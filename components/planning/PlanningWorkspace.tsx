@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Order, Location, Carrier, Vehicle } from "@/lib/domain/types";
-import { quoteTransportOptions, findVehicleForWeight, type TransportOptionQuote } from "@/lib/planning/quote";
+import { analyzePlanning, explainPlan, type PlanOption } from "@/lib/planning/plans";
 import { useSimulation } from "@/components/simulation/SimulationProvider";
 
 export function PlanningWorkspace({
@@ -23,8 +23,10 @@ export function PlanningWorkspace({
   const router = useRouter();
 
   const [selectedIds, setSelectedIds] = useState<string[]>(preselectedOrderId ? [preselectedOrderId] : []);
+  const [analyzed, setAnalyzed] = useState(false);
+  const [chosenPlanKey, setChosenPlanKey] = useState<PlanOption["key"] | null>(null);
+  const [expandedReasons, setExpandedReasons] = useState<PlanOption["key"] | null>(null);
   const [pendingLoadKey, setPendingLoadKey] = useState<string | null>(null);
-  const [chosenOption, setChosenOption] = useState<TransportOptionQuote | null>(null);
 
   useEffect(() => {
     if (preselectedOrderId && orders.some((o) => o.id === preselectedOrderId)) {
@@ -33,24 +35,13 @@ export function PlanningWorkspace({
   }, [preselectedOrderId, orders]);
 
   const toggle = (orderId: string) => {
+    if (analyzed) return;
     setSelectedIds((prev) =>
       prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
     );
   };
 
   const selectedOrders = orders.filter((o) => selectedIds.includes(o.id));
-  const totalWeightKg = selectedOrders.reduce((sum, o) => sum + o.totalWeightKg, 0);
-  const totalVolumeM3 = Math.round(selectedOrders.reduce((sum, o) => sum + o.totalVolumeM3, 0) * 10) / 10;
-
-  const matchedVehicle = useMemo(() => findVehicleForWeight(vehicles, totalWeightKg), [vehicles, totalWeightKg]);
-  const capacityOk = totalWeightKg === 0 || !!matchedVehicle;
-  const occupancyPercent = matchedVehicle ? Math.round((totalWeightKg / matchedVehicle.capacityKg) * 100) : 0;
-
-  const options = useMemo(
-    () => (capacityOk ? quoteTransportOptions(totalWeightKg, carriers) : []),
-    [capacityOk, totalWeightKg, carriers]
-  );
-
   const referenceOrder = selectedOrders[0];
   const compatibleOrderIds = new Set(
     referenceOrder
@@ -60,27 +51,43 @@ export function PlanningWorkspace({
       : orders.map((o) => o.id)
   );
 
-  // Encontra a carga recém-criada procurando por um load cujo conjunto de pedidos
-  // corresponda exatamente à seleção pendente (o reducer gera o id internamente).
+  const analysis = useMemo(
+    () => (analyzed && selectedOrders.length > 0 ? analyzePlanning(selectedOrders, carriers, vehicles) : null),
+    [analyzed, selectedOrders, carriers, vehicles]
+  );
+
+  const chosenPlan = analysis?.plans.find((p) => p.key === chosenPlanKey) ?? null;
+
   const createdLoad = pendingLoadKey
     ? data.loads.find((l) => [...l.orderIds].sort().join(",") === pendingLoadKey)
     : undefined;
 
-  const handleConsolidate = () => {
-    if (!capacityOk || selectedOrders.length === 0) return;
-    const key = [...selectedIds].sort().join(",");
-    setPendingLoadKey(key);
-    createLoad(selectedIds);
+  const handleReset = () => {
+    setAnalyzed(false);
+    setChosenPlanKey(null);
+    setExpandedReasons(null);
+    setPendingLoadKey(null);
   };
 
-  const handleConfirmContracting = () => {
-    if (!createdLoad || !chosenOption) return;
-    createShipment(createdLoad.id, chosenOption);
-    setTimeout(() => {
-      const shipment = data.shipments.find((s) => s.loadId === createdLoad.id);
-      if (shipment) router.push(`/shipments/${shipment.id}`);
-    }, 0);
+  const handleConfirmPlan = () => {
+    if (!chosenPlan) return;
+    const key = [...chosenPlan.orderIds].sort().join(",");
+    setPendingLoadKey(key);
+    createLoad(chosenPlan.orderIds);
   };
+
+  // Depois que a carga é criada, dispara a contratação da opção do plano escolhido.
+  useEffect(() => {
+    if (createdLoad && chosenPlan && !createdLoad.shipmentId) {
+      createShipment(createdLoad.id, chosenPlan.transportOption);
+    }
+  }, [createdLoad, chosenPlan, createShipment]);
+
+  useEffect(() => {
+    if (createdLoad?.shipmentId) {
+      router.push(`/shipments/${createdLoad.shipmentId}`);
+    }
+  }, [createdLoad, router]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 flex-1 min-h-0 overflow-hidden divide-x divide-cosmic-ink/10">
@@ -98,8 +105,8 @@ export function PlanningWorkspace({
             return (
               <button
                 key={order.id}
-                onClick={() => isCompatible && !createdLoad && toggle(order.id)}
-                disabled={!isCompatible || !!createdLoad}
+                onClick={() => isCompatible && toggle(order.id)}
+                disabled={!isCompatible || analyzed}
                 className={`w-full text-left px-5 py-3 transition-colors ${
                   isSelected
                     ? "bg-blue-opal/10"
@@ -121,21 +128,16 @@ export function PlanningWorkspace({
         </div>
       </div>
 
-      {/* CENTRO — Composição da carga */}
+      {/* CENTRO — Pedidos selecionados e compatibilidade */}
       <div className="overflow-y-auto">
         <p className="sticky top-0 bg-milk-mustache px-5 py-3 text-[11px] uppercase tracking-wider text-cosmic-ink/50 border-b border-cosmic-ink/10">
-          Composição da Carga
+          Pedidos Selecionados
         </p>
         <div className="px-5 py-4">
           {selectedOrders.length === 0 ? (
             <p className="text-sm text-cosmic-ink/45">Selecione pedidos compatíveis à esquerda.</p>
           ) : (
             <>
-              {createdLoad && (
-                <p className="mb-3 inline-block rounded-full bg-blue-opal/10 text-blue-opal text-xs font-medium px-2.5 py-1">
-                  {createdLoad.id} criada
-                </p>
-              )}
               <p className="font-display font-semibold text-lg text-cosmic-ink mb-1">
                 {selectedOrders.length} pedido{selectedOrders.length > 1 ? "s" : ""}
               </p>
@@ -145,34 +147,17 @@ export function PlanningWorkspace({
               </p>
 
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <MiniField label="Peso" value={`${totalWeightKg.toLocaleString("pt-BR")} kg`} />
-                <MiniField label="Volume" value={`${totalVolumeM3} m³`} />
+                <MiniField
+                  label="Peso total"
+                  value={`${selectedOrders.reduce((s, o) => s + o.totalWeightKg, 0).toLocaleString("pt-BR")} kg`}
+                />
+                <MiniField
+                  label="Volume total"
+                  value={`${Math.round(selectedOrders.reduce((s, o) => s + o.totalVolumeM3, 0) * 10) / 10} m³`}
+                />
               </div>
 
-              {capacityOk ? (
-                matchedVehicle && (
-                  <div className="rounded-md border border-cosmic-ink/10 bg-white/60 px-4 py-3 text-sm">
-                    <p className="text-cosmic-ink/70">
-                      Veículo compatível: <span className="font-medium text-cosmic-ink">{matchedVehicle.id}</span>{" "}
-                      ({matchedVehicle.type})
-                    </p>
-                    <p className="text-cosmic-ink/55 mt-1">
-                      Ocupação: <span className="tabular">{occupancyPercent}%</span> de{" "}
-                      {matchedVehicle.capacityKg.toLocaleString("pt-BR")} kg
-                    </p>
-                  </div>
-                )
-              ) : (
-                <div className="rounded-md border border-cinnamon/30 bg-cinnamon/8 px-4 py-3 text-sm text-cinnamon">
-                  <p className="font-medium">CAPACIDADE INSUFICIENTE</p>
-                  <p className="mt-1 tabular">
-                    Carga: {totalWeightKg.toLocaleString("pt-BR")} kg · Nenhum veículo disponível comporta esse
-                    volume
-                  </p>
-                </div>
-              )}
-
-              <ul className="mt-4 space-y-1">
+              <ul className="space-y-1 mb-5">
                 {selectedOrders.map((o) => (
                   <li key={o.id} className="text-sm text-cosmic-ink/70 flex justify-between">
                     <span>{o.id}</span>
@@ -181,97 +166,195 @@ export function PlanningWorkspace({
                 ))}
               </ul>
 
-              {!createdLoad && (
+              {!analyzed ? (
                 <button
-                  onClick={handleConsolidate}
-                  disabled={!capacityOk}
-                  className="mt-5 w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setAnalyzed(true)}
+                  className="w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors"
                 >
-                  Consolidar Carga
+                  Analisar Consolidação
                 </button>
+              ) : (
+                <>
+                  {analysis?.compatible ? (
+                    <div className="rounded-md border border-emerald-600/25 bg-emerald-600/5 px-4 py-3 text-sm">
+                      <p className="font-medium text-emerald-700 mb-1.5">Consolidação Viável</p>
+                      <ul className="space-y-1 text-emerald-700/90 text-xs">
+                        <li>✓ mesma origem e destino</li>
+                        <li>✓ capacidade disponível ({analysis.vehicle?.id} · {analysis.vehicle?.type})</li>
+                        <li>
+                          ✓ ocupação estimada:{" "}
+                          {Math.round((analysis.totalWeightKg / (analysis.vehicle?.capacityKg ?? 1)) * 100)}%
+                        </li>
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-cinnamon/30 bg-cinnamon/8 px-4 py-3 text-sm text-cinnamon">
+                      <p className="font-medium">CAPACIDADE EXCEDIDA</p>
+                      <p className="mt-1 tabular">
+                        Carga: {analysis?.totalWeightKg.toLocaleString("pt-BR")} kg · Nenhum veículo disponível
+                        comporta esse volume.
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleReset}
+                    className="mt-3 w-full rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2 hover:bg-cosmic-ink/5 transition-colors"
+                  >
+                    Refazer Seleção
+                  </button>
+                </>
               )}
             </>
           )}
         </div>
       </div>
 
-      {/* DIREITA — Cotação, comparação e contratação */}
+      {/* DIREITA — Planos, comparação e contratação */}
       <div className="overflow-y-auto">
         <p className="sticky top-0 bg-milk-mustache px-5 py-3 text-[11px] uppercase tracking-wider text-cosmic-ink/50 border-b border-cosmic-ink/10">
-          Opções de Transporte
+          Alternativas de Planejamento
         </p>
         <div className="px-5 py-4 space-y-3">
-          {!createdLoad && (
-            <p className="text-sm text-cosmic-ink/45">Consolide a carga para ver opções de transporte.</p>
+          {!analysis?.compatible && (
+            <p className="text-sm text-cosmic-ink/45">
+              Analise a consolidação dos pedidos selecionados para ver alternativas de planejamento.
+            </p>
           )}
 
-          {createdLoad && !chosenOption && (
+          {analysis?.compatible && !chosenPlan && (
             <>
               <p className="text-xs text-cosmic-ink/45">
-                Valor de frete simulado — não representa tabela real de nenhuma transportadora. Menor frete não é
-                necessariamente a melhor opção: compare SLA e nível de serviço (OTIF).
+                Valores e pesos do índice de adequação são parâmetros simulados para fins de estudo. Menor frete não
+                é necessariamente o melhor plano.
               </p>
-              {options.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => setChosenOption(option)}
-                  className="w-full text-left rounded-md border border-cosmic-ink/10 bg-white/60 px-4 py-3 hover:border-blue-opal/40 hover:bg-blue-opal/5 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-display font-medium text-sm text-cosmic-ink">{option.label}</p>
-                    <p className="font-display font-semibold tabular text-cosmic-ink">
-                      R$ {option.price.toLocaleString("pt-BR")}
-                    </p>
-                  </div>
-                  <div className="mt-1.5 flex gap-3 text-xs text-cosmic-ink/55">
-                    <span>Prazo D+{option.etaDays}</span>
-                    <span>SLA {option.slaPercent}%</span>
-                    <span>Nível de Serviço (OTIF) {option.otifPercent}%</span>
-                  </div>
-                </button>
+              {analysis.plans.map((plan) => (
+                <PlanCard
+                  key={plan.key}
+                  plan={plan}
+                  isRecommended={plan.key === analysis.recommendedKey}
+                  isExpanded={expandedReasons === plan.key}
+                  reasons={explainPlan(plan, analysis.plans)}
+                  onToggleReasons={() => setExpandedReasons((prev) => (prev === plan.key ? null : plan.key))}
+                  onSelect={() => setChosenPlanKey(plan.key)}
+                />
               ))}
             </>
           )}
 
-          {chosenOption && (
+          {chosenPlan && (
             <div className="rounded-md border border-blue-opal/25 bg-blue-opal/5 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-wider text-blue-opal/70 mb-1">Transporte Selecionado</p>
-              <p className="font-display font-semibold text-cosmic-ink mb-3">{chosenOption.label}</p>
+              <p className="text-[11px] uppercase tracking-wider text-blue-opal/70 mb-1">
+                Plano {chosenPlan.key} Selecionado
+              </p>
+              <p className="font-display font-semibold text-cosmic-ink mb-3">
+                {chosenPlan.name} · {chosenPlan.transportOption.label}
+              </p>
 
               <div className="space-y-1.5 text-sm">
-                <BreakdownRow label="Frete peso" value={chosenOption.breakdown.freightWeight} />
-                <BreakdownRow label="Ad Valorem" value={chosenOption.breakdown.adValorem} />
-                <BreakdownRow label="GRIS" value={chosenOption.breakdown.gris} />
-                <BreakdownRow label="Pedágio" value={chosenOption.breakdown.toll} />
-                <BreakdownRow label="Taxa de entrega" value={chosenOption.breakdown.deliveryFee} />
+                <BreakdownRow label="Frete peso" value={chosenPlan.transportOption.breakdown.freightWeight} />
+                <BreakdownRow label="Ad Valorem" value={chosenPlan.transportOption.breakdown.adValorem} />
+                <BreakdownRow label="GRIS" value={chosenPlan.transportOption.breakdown.gris} />
+                <BreakdownRow label="Pedágio" value={chosenPlan.transportOption.breakdown.toll} />
+                <BreakdownRow label="Taxa de entrega" value={chosenPlan.transportOption.breakdown.deliveryFee} />
                 <div className="border-t border-blue-opal/20 pt-1.5 mt-1.5 flex justify-between font-display font-semibold text-cosmic-ink">
                   <span>Total</span>
-                  <span className="tabular">R$ {chosenOption.breakdown.total.toLocaleString("pt-BR")}</span>
+                  <span className="tabular">R$ {chosenPlan.transportOption.breakdown.total.toLocaleString("pt-BR")}</span>
                 </div>
               </div>
 
               <p className="text-[11px] text-cosmic-ink/40 mt-2">
-                Frete simulado para fins didáticos · Prazo D+{chosenOption.etaDays} · SLA {chosenOption.slaPercent}%
+                Valores simulados para fins de estudo · Prazo D+{chosenPlan.transportOption.etaDays} · SLA{" "}
+                {chosenPlan.transportOption.slaPercent}%
               </p>
 
               <div className="mt-4 flex gap-2">
                 <button
-                  onClick={() => setChosenOption(null)}
+                  onClick={() => setChosenPlanKey(null)}
                   className="flex-1 rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2 hover:bg-cosmic-ink/5 transition-colors"
                 >
-                  Trocar
+                  Trocar Plano
                 </button>
                 <button
-                  onClick={handleConfirmContracting}
-                  className="flex-1 rounded-md bg-blue-opal text-white text-sm font-medium py-2 hover:bg-blue-opal/90 transition-colors"
+                  onClick={handleConfirmPlan}
+                  disabled={!!pendingLoadKey}
+                  className="flex-1 rounded-md bg-blue-opal text-white text-sm font-medium py-2 hover:bg-blue-opal/90 transition-colors disabled:opacity-50"
                 >
-                  Confirmar Contratação
+                  Confirmar Planejamento
                 </button>
               </div>
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function PlanCard({
+  plan,
+  isRecommended,
+  isExpanded,
+  reasons,
+  onToggleReasons,
+  onSelect,
+}: {
+  plan: PlanOption;
+  isRecommended: boolean;
+  isExpanded: boolean;
+  reasons: string[];
+  onToggleReasons: () => void;
+  onSelect: () => void;
+}) {
+  return (
+    <div
+      className={`rounded-md border px-4 py-3 ${
+        isRecommended ? "border-blue-opal/40 bg-blue-opal/5" : "border-cosmic-ink/10 bg-white/60"
+      }`}
+    >
+      {isRecommended && (
+        <p className="text-[10px] uppercase tracking-wider font-medium text-blue-opal mb-1.5">Plano Recomendado</p>
+      )}
+      <div className="flex items-center justify-between">
+        <p className="font-display font-medium text-sm text-cosmic-ink">
+          Plano {plan.key} · {plan.name}
+        </p>
+        <p className="font-display font-semibold tabular text-cosmic-ink">{plan.score}/100</p>
+      </div>
+      <p className="text-xs text-cosmic-ink/55 mt-1">{plan.strategy}</p>
+
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-cosmic-ink/60">
+        <span>{plan.transportOption.label}</span>
+        <span>R$ {plan.transportOption.price.toLocaleString("pt-BR")}</span>
+        <span>D+{plan.transportOption.etaDays}</span>
+        <span>SLA {plan.transportOption.slaPercent}%</span>
+        <span>OTIF {plan.transportOption.otifPercent}%</span>
+        <span>Ocupação {plan.occupancyPercent}%</span>
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={onToggleReasons}
+          className="text-xs font-medium text-blue-opal hover:underline"
+        >
+          Por que este plano?
+        </button>
+        <button
+          onClick={onSelect}
+          className="ml-auto rounded-md bg-blue-opal text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-opal/90 transition-colors"
+        >
+          Selecionar Plano
+        </button>
+      </div>
+
+      {isExpanded && (
+        <ul className="mt-3 space-y-1 border-t border-cosmic-ink/10 pt-2">
+          {reasons.map((reason, i) => (
+            <li key={i} className="text-xs text-cosmic-ink/70">
+              ✓ {reason}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
