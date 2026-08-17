@@ -73,7 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Empresa", href: "/config/empresa" },
       { label: "Centros de Distribuição", href: "/config/cds" },
       { label: "Parâmetros Operacionais", href: "/config/parametros" },
-      { label: "Preferências", href: "/config/preferencias" },
+      { label: "Preferências", href: "/config/preferencias", ready: true },
     ],
   },
 ];
