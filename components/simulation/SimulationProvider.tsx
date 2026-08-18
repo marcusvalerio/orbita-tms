@@ -65,8 +65,21 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
 
   const dispatch = useCallback(
     (action: SimulationAction) => {
-      setData((prev) => (prev ? reduce(prev, action) : prev));
-      pushToast(toastForAction(action));
+      let succeeded = true;
+      setData((prev) => {
+        if (!prev) return prev;
+        try {
+          return reduce(prev, action);
+        } catch (err) {
+          // Causa raiz de qualquer falha é sempre investigada — isto é só a
+          // rede de segurança: a ação nunca deve corromper o estado nem
+          // derrubar a interface. O estado anterior é preservado.
+          console.error("Falha ao processar ação da simulação:", action.type, err);
+          succeeded = false;
+          return prev;
+        }
+      });
+      pushToast(succeeded ? toastForAction(action) : "Não foi possível concluir a ação. A operação não foi alterada.");
     },
     [pushToast]
   );

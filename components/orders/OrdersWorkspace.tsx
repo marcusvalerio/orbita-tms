@@ -146,7 +146,7 @@ function OrderDetailPanel({
           <h2 className="font-display font-semibold text-lg text-cosmic-ink">{order.id}</h2>
           <p className="text-sm text-cosmic-ink/60 mt-0.5">{customer?.name ?? "Cliente"}</p>
         </div>
-        <button
+        <button type="button"
           onClick={onClose}
           className="text-cosmic-ink/40 hover:text-cosmic-ink text-sm"
           aria-label="Fechar"
@@ -242,7 +242,7 @@ function OrderDetailPanel({
 function PlanTransportButton({ orderId }: { orderId: string }) {
   const router = useRouter();
   return (
-    <button
+    <button type="button"
       onClick={() => router.push(`/planning?order=${orderId}`)}
       className="w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors"
     >

@@ -128,7 +128,7 @@ export default function ShipmentDetailPage() {
 
           <div className="mt-5 flex gap-2">
             {shipment.status === "Planned" && (
-              <button
+              <button type="button"
                 onClick={() => startShipment(shipment.id)}
                 className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
               >
@@ -136,7 +136,7 @@ export default function ShipmentDetailPage() {
               </button>
             )}
             {(shipment.status === "In Transit" || shipment.status === "At Delivery") && !unresolvedOccurrence && (
-              <button
+              <button type="button"
                 onClick={() => completeDelivery(shipment.id)}
                 className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
               >
@@ -144,7 +144,7 @@ export default function ShipmentDetailPage() {
               </button>
             )}
             {(shipment.status === "In Transit" || shipment.status === "At Delivery") && !unresolvedOccurrence && (
-              <button
+              <button type="button"
                 onClick={() => setShowOccurrenceForm((v) => !v)}
                 className="rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium px-4 py-2 hover:bg-cosmic-ink/5 transition-colors"
               >
@@ -168,7 +168,7 @@ export default function ShipmentDetailPage() {
             <h2 className="font-display font-semibold text-sm text-cosmic-ink mb-3">Registrar Ocorrência</h2>
             <div className="flex flex-wrap gap-2">
               {OCCURRENCE_TYPES.map((type) => (
-                <button
+                <button type="button"
                   key={type}
                   onClick={() => {
                     createOccurrence(shipment.id, type);
@@ -203,7 +203,7 @@ export default function ShipmentDetailPage() {
                   {!occurrence.resolved && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {RESOLUTION_ACTIONS.map((action) => (
-                        <button
+                        <button type="button"
                           key={action}
                           onClick={() => resolveOccurrence(occurrence.id, action)}
                           className="rounded-md border border-cosmic-ink/15 text-cosmic-ink text-xs font-medium px-3 py-1.5 hover:bg-cosmic-ink/5 transition-colors"

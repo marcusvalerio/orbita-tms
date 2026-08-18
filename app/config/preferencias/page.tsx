@@ -20,7 +20,7 @@ export default function PreferenciasPage() {
             andamento — para você explorar o sistema sem precisar construir do zero.
             {!isEmpty && " Isso substitui a operação atual."}
           </p>
-          <button
+          <button type="button"
             onClick={() => setShowConfirmDemo(true)}
             className="rounded-md border border-blue-opal/30 text-blue-opal text-sm font-medium px-4 py-2 hover:bg-blue-opal/5 transition-colors"
           >
@@ -35,7 +35,7 @@ export default function PreferenciasPage() {
             zera os contadores de identificadores (o próximo pedido volta a ser PED-00001) e restaura a operação
             para o estado inicial vazio.
           </p>
-          <button
+          <button type="button"
             onClick={() => setShowConfirmReset(true)}
             className="rounded-md border border-cinnamon/40 text-cinnamon text-sm font-medium px-4 py-2 hover:bg-cinnamon/10 transition-colors"
           >
@@ -96,13 +96,13 @@ function ConfirmDialog({
         <h2 className="font-display font-semibold text-lg text-cosmic-ink mb-2">{title}</h2>
         <p className="text-sm text-cosmic-ink/60 mb-5">{message}</p>
         <div className="flex gap-2">
-          <button
+          <button type="button"
             onClick={onCancel}
             className="flex-1 rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2.5 hover:bg-cosmic-ink/5 transition-colors"
           >
             Cancelar
           </button>
-          <button
+          <button type="button"
             onClick={onConfirm}
             className={`flex-1 rounded-md text-white text-sm font-medium py-2.5 transition-colors ${confirmClassName}`}
           >

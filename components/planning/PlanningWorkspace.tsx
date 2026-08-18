@@ -103,7 +103,7 @@ export function PlanningWorkspace({
             const isSelected = selectedIds.includes(order.id);
             const isCompatible = compatibleOrderIds.has(order.id);
             return (
-              <button
+              <button type="button"
                 key={order.id}
                 onClick={() => isCompatible && toggle(order.id)}
                 disabled={!isCompatible || analyzed}
@@ -167,7 +167,7 @@ export function PlanningWorkspace({
               </ul>
 
               {!analyzed ? (
-                <button
+                <button type="button"
                   onClick={() => setAnalyzed(true)}
                   className="w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors"
                 >
@@ -196,7 +196,7 @@ export function PlanningWorkspace({
                       </p>
                     </div>
                   )}
-                  <button
+                  <button type="button"
                     onClick={handleReset}
                     className="mt-3 w-full rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2 hover:bg-cosmic-ink/5 transition-colors"
                   >
@@ -268,13 +268,13 @@ export function PlanningWorkspace({
               </p>
 
               <div className="mt-4 flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setChosenPlanKey(null)}
                   className="flex-1 rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2 hover:bg-cosmic-ink/5 transition-colors"
                 >
                   Trocar Plano
                 </button>
-                <button
+                <button type="button"
                   onClick={handleConfirmPlan}
                   disabled={!!pendingLoadKey}
                   className="flex-1 rounded-md bg-blue-opal text-white text-sm font-medium py-2 hover:bg-blue-opal/90 transition-colors disabled:opacity-50"
@@ -332,13 +332,13 @@ function PlanCard({
       </div>
 
       <div className="mt-3 flex gap-2">
-        <button
+        <button type="button"
           onClick={onToggleReasons}
           className="text-xs font-medium text-blue-opal hover:underline"
         >
           Por que este plano?
         </button>
-        <button
+        <button type="button"
           onClick={onSelect}
           className="ml-auto rounded-md bg-blue-opal text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-opal/90 transition-colors"
         >

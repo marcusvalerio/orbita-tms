@@ -103,7 +103,7 @@ export function GlobalSearch({
             <div key={group.title} className="py-1">
               <p className="px-4 py-1 text-[10px] uppercase tracking-wider text-cosmic-ink/40">{group.title}</p>
               {group.results.map((result) => (
-                <button
+                <button type="button"
                   key={`${group.title}-${result.id}`}
                   onMouseDown={() => handleSelect(result)}
                   className="w-full text-left px-4 py-2 hover:bg-blue-opal/5 flex items-center justify-between gap-3"

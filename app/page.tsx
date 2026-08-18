@@ -54,13 +54,13 @@ export default function OverviewPage() {
               Comece criando o primeiro pedido — ele entra automaticamente na fila de planejamento.
             </p>
             <div className="flex items-center justify-center gap-2">
-              <button
+              <button type="button"
                 onClick={() => setShowNewOrder(true)}
                 className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
               >
                 + Novo Pedido
               </button>
-              <button
+              <button type="button"
                 onClick={loadDemoScenario}
                 className="rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium px-4 py-2 hover:bg-cosmic-ink/5 transition-colors"
               >

@@ -107,7 +107,7 @@ export function Sidebar() {
           const isOpen = !!openGroups[group.label];
           return (
             <div key={group.label} className="pt-3">
-              <button
+              <button type="button"
                 onClick={() => toggleGroup(group.label)}
                 className="w-full flex items-center justify-between px-3 mb-1 text-[11px] font-medium uppercase tracking-wider text-white/40 hover:text-white/60"
               >
