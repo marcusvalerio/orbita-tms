@@ -20,10 +20,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Central Operacional",
     items: [
       { label: "Pedidos", href: "/orders", ready: true },
-      { label: "Cargas", href: "/loads" },
+      { label: "Cargas", href: "/loads", ready: true },
       { label: "Viagens", href: "/shipments", ready: true },
-      { label: "Entregas", href: "/deliveries" },
-      { label: "Ocorrências", href: "/occurrences" },
+      { label: "Entregas", href: "/deliveries", ready: true },
+      { label: "Ocorrências", href: "/occurrences", ready: true },
     ],
   },
   {

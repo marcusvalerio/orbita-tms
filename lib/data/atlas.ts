@@ -98,6 +98,7 @@ export interface OperationalAlert {
   id: string;
   message: string;
   severity: "info" | "attention" | "critical";
+  href?: string;
 }
 
 export function getOperationalAlerts(data: OperationDataset): OperationalAlert[] {
@@ -107,8 +108,12 @@ export function getOperationalAlerts(data: OperationDataset): OperationalAlert[]
   if (lateDeliveries.length > 0) {
     alerts.push({
       id: "late-deliveries",
-      message: `${lateDeliveries.length} entregas ultrapassaram a janela prevista.`,
+      message:
+        lateDeliveries.length === 1
+          ? "1 entrega ultrapassou a janela prevista."
+          : `${lateDeliveries.length} entregas ultrapassaram a janela prevista.`,
       severity: "critical",
+      href: "/deliveries",
     });
   }
 
@@ -116,8 +121,12 @@ export function getOperationalAlerts(data: OperationDataset): OperationalAlert[]
   if (loadsAwaitingContract.length > 0) {
     alerts.push({
       id: "loads-awaiting-carrier",
-      message: `${loadsAwaitingContract.length} cargas aguardam contratação.`,
+      message:
+        loadsAwaitingContract.length === 1
+          ? "1 carga aguarda contratação."
+          : `${loadsAwaitingContract.length} cargas aguardam contratação.`,
       severity: "attention",
+      href: "/contratacao",
     });
   }
 
@@ -125,8 +134,12 @@ export function getOperationalAlerts(data: OperationDataset): OperationalAlert[]
   if (unresolvedOccurrences.length > 0) {
     alerts.push({
       id: "open-occurrences",
-      message: `${unresolvedOccurrences.length} ocorrências em aberto na operação.`,
+      message:
+        unresolvedOccurrences.length === 1
+          ? "1 ocorrência aguarda resolução."
+          : `${unresolvedOccurrences.length} ocorrências aguardam resolução.`,
       severity: "critical",
+      href: "/occurrences",
     });
   }
 

@@ -72,21 +72,31 @@ export default function OverviewPage() {
 
         <Section title="Status da Operação">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MiniStat label="Pedidos" value={metrics.orderCount} />
-            <MiniStat label="Cargas" value={metrics.loadCount} />
-            <MiniStat label="Viagens" value={metrics.shipmentCount} />
-            <MiniStat label="Entregas" value={metrics.deliveryCount} />
+            <MiniStat label="Pedidos" value={metrics.orderCount} href="/orders" />
+            <MiniStat label="Cargas" value={metrics.loadCount} href="/loads" />
+            <MiniStat label="Viagens" value={metrics.shipmentCount} href="/shipments" />
+            <MiniStat label="Entregas" value={metrics.deliveryCount} href="/deliveries" />
           </div>
           {alerts.length > 0 && (
             <div className="mt-3 space-y-2">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`rounded-md border px-4 py-2.5 text-sm ${SEVERITY_STYLES[alert.severity]}`}
-                >
-                  {alert.message}
-                </div>
-              ))}
+              {alerts.map((alert) =>
+                alert.href ? (
+                  <Link
+                    key={alert.id}
+                    href={alert.href}
+                    className={`block rounded-md border px-4 py-2.5 text-sm hover:brightness-95 transition-[filter] ${SEVERITY_STYLES[alert.severity]}`}
+                  >
+                    {alert.message}
+                  </Link>
+                ) : (
+                  <div
+                    key={alert.id}
+                    className={`rounded-md border px-4 py-2.5 text-sm ${SEVERITY_STYLES[alert.severity]}`}
+                  >
+                    {alert.message}
+                  </div>
+                )
+              )}
             </div>
           )}
         </Section>
@@ -133,9 +143,9 @@ export default function OverviewPage() {
           </Section>
 
           <Section title="Fila de Planejamento" href="/planning" count={ordersAwaiting.length + loadsAwaitingCarrier.length}>
-            <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3 space-y-2">
-              <QueueRow label="Pedidos aguardando planejamento" value={ordersAwaiting.length} />
-              <QueueRow label="Cargas aguardando contratação" value={loadsAwaitingCarrier.length} />
+            <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 divide-y divide-cosmic-ink/5">
+              <QueueRow label="Pedidos aguardando planejamento" value={ordersAwaiting.length} href="/planning" />
+              <QueueRow label="Cargas aguardando contratação" value={loadsAwaitingCarrier.length} href="/contratacao" />
             </div>
           </Section>
 
@@ -201,29 +211,42 @@ function MiniStat({
   label,
   value,
   suffix,
+  href,
 }: {
   label: string;
   value: string | number | null;
   suffix?: string;
+  href?: string;
 }) {
   const isEmpty = value === null;
-  return (
-    <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3">
+  const content = (
+    <>
       <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/50 mb-1">{label}</p>
       <p className={`font-display font-semibold text-2xl tabular ${isEmpty ? "text-cosmic-ink/30" : "text-cosmic-ink"}`}>
         {isEmpty ? "—" : value}
         {!isEmpty && suffix && <span className="text-base font-medium ml-0.5">{suffix}</span>}
       </p>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className="block rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3 hover:border-blue-opal/30 hover:bg-blue-opal/5 transition-colors">
+        {content}
+      </Link>
+    );
+  }
+  return <div className="rounded-lg border border-cosmic-ink/10 bg-white/60 px-4 py-3">{content}</div>;
 }
 
-function QueueRow({ label, value }: { label: string; value: number }) {
+function QueueRow({ label, value, href }: { label: string; value: number; href: string }) {
   return (
-    <div className="flex items-center justify-between text-sm">
+    <Link href={href} className="flex items-center justify-between text-sm px-4 py-2.5 hover:bg-blue-opal/5 transition-colors first:rounded-t-lg last:rounded-b-lg">
       <span className="text-cosmic-ink/70">{label}</span>
-      <span className="font-display font-semibold tabular text-cosmic-ink">{value}</span>
-    </div>
+      <span className="flex items-center gap-2">
+        <span className="font-display font-semibold tabular text-cosmic-ink">{value}</span>
+        <span className="text-cosmic-ink/30">→</span>
+      </span>
+    </Link>
   );
 }
 

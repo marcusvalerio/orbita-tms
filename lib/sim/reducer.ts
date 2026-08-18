@@ -59,9 +59,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
   switch (action.type) {
     case "CREATE_ORDER": {
       const { input } = action;
-      let counters = state.counters;
-      let orderId: string;
-      [orderId, counters] = takeId(counters, "order", "PED");
+      const [orderId, counters] = takeId(state.counters, "order", "PED");
 
       const item: OrderItem = {
         id: `${orderId}-item-1`,
@@ -98,9 +96,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       const totalWeightKg = orders.reduce((sum, o) => sum + o.totalWeightKg, 0);
       const totalVolumeM3 = Math.round(orders.reduce((sum, o) => sum + o.totalVolumeM3, 0) * 10) / 10;
 
-      let counters = state.counters;
-      let loadId: string;
-      [loadId, counters] = takeId(counters, "load", "CAR");
+      const [loadId, counters] = takeId(state.counters, "load", "CAR");
 
       const load: Load = {
         id: loadId,
@@ -131,9 +127,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       const vehicle = state.vehicles.find((v) => v.status === "Disponível" && v.capacityKg >= load.totalWeightKg);
       const driver = state.drivers.find((d) => d.status === "Disponível");
 
-      let counters = state.counters;
-      let shipmentId: string;
-      [shipmentId, counters] = takeId(counters, "shipment", "VIA");
+      const [shipmentId, counters] = takeId(state.counters, "shipment", "VIA");
 
       const departure = new Date().toISOString();
       const eta = new Date(Date.now() + action.option.etaDays * 86400000).toISOString();
@@ -203,9 +197,7 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       if (!shipment) return state;
       const load = state.loads.find((l) => l.id === shipment.loadId);
 
-      let counters = state.counters;
-      let occurrenceId: string;
-      [occurrenceId, counters] = takeId(counters, "occurrence", "OCC");
+      const [occurrenceId, counters] = takeId(state.counters, "occurrence", "OCC");
 
       const occurrence: Occurrence = {
         id: occurrenceId,

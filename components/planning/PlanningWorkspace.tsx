@@ -41,7 +41,10 @@ export function PlanningWorkspace({
     );
   };
 
-  const selectedOrders = orders.filter((o) => selectedIds.includes(o.id));
+  const selectedOrders = useMemo(
+    () => orders.filter((o) => selectedIds.includes(o.id)),
+    [orders, selectedIds]
+  );
   const referenceOrder = selectedOrders[0];
   const compatibleOrderIds = new Set(
     referenceOrder
