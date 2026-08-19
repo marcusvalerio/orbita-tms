@@ -1,13 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  /* Paleta ÓRBITA */
-  --color-cosmic-ink: #062540;
-  --color-blue-opal: #124168;
-  --color-suez-canal: #235e80;
-  --color-rowdy-orange: #eaa007;
-  --color-cinnamon: #d26911;
-  --color-milk-mustache: #faf3e6;
+  /* Paleta ÓRBITA v2 — Tangerine Tango / Charcoal / Platinum / Powder Blue.
+     Os nomes das variáveis (herdados da paleta anterior) foram mantidos de
+     propósito para não exigir nenhuma alteração em componentes — só o
+     valor hexadecimal muda. Mapeamento semântico:
+       cosmic-ink     → Charcoal      (estrutura, navegação, texto forte)
+       milk-mustache  → Platinum      (fundo principal)
+       blue-opal      → Tangerine     (ação/CTA/seleção — antes ocupado pelo azul)
+       cinnamon       → Tangerine     (ocorrência/estado crítico)
+       suez-canal     → Powder Blue   (informação/estado neutro em trânsito)
+       rowdy-orange   → Powder Blue   (atenção/aguardando — menos urgente que crítico) */
+  --color-cosmic-ink: #161616;
+  --color-blue-opal: #ff5b19;
+  --color-suez-canal: #aecacd;
+  --color-rowdy-orange: #aecacd;
+  --color-cinnamon: #ff5b19;
+  --color-milk-mustache: #e5e3d2;
 
   --background: var(--color-milk-mustache);
   --foreground: var(--color-cosmic-ink);

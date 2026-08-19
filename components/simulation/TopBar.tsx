@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { GlobalSearch } from "./GlobalSearch";
 import { NewOrderModal } from "./NewOrderModal";
+import { OrbitaMark } from "@/components/ui/OrbitaMark";
 
 export function TopBar() {
   const [showSearch, setShowSearch] = useState(false);
@@ -12,8 +13,11 @@ export function TopBar() {
   return (
     <>
       <div className="flex items-center justify-between gap-2 px-4 md:px-6 py-2 border-b border-cosmic-ink/10 bg-white/40 relative">
-        <Link href="/" className="font-display font-semibold text-[15px] text-cosmic-ink tracking-tight shrink-0">
-          ÓRBITA TMS
+        <Link href="/" className="flex items-center gap-1.5 shrink-0">
+          <OrbitaMark size={16} />
+          <span className="font-display font-semibold text-[15px] text-cosmic-ink tracking-tight">
+            ÓRBITA TMS
+          </span>
         </Link>
 
         <div className="flex items-center gap-2 shrink-0">

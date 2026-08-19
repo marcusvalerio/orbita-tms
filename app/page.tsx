@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useSimulation } from "@/components/simulation/SimulationProvider";
 import {
   getOverviewMetrics,
@@ -13,13 +14,22 @@ import {
 import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { NewOrderModal } from "@/components/simulation/NewOrderModal";
-import { useState } from "react";
 
 const SEVERITY_STYLES: Record<string, string> = {
   info: "border-blue-opal/20 bg-blue-opal/5 text-blue-opal",
   attention: "border-rowdy-orange/25 bg-rowdy-orange/8 text-rowdy-orange",
   critical: "border-cinnamon/25 bg-cinnamon/8 text-cinnamon",
 };
+
+const QUICK_ACCESS = [
+  { label: "Pedidos", href: "/orders" },
+  { label: "Planejamento", href: "/planning" },
+  { label: "Contratação", href: "/contratacao" },
+  { label: "Cargas", href: "/loads" },
+  { label: "Viagens", href: "/shipments" },
+  { label: "Entregas", href: "/deliveries" },
+  { label: "Ocorrências", href: "/occurrences" },
+];
 
 function timeAgo(iso: string) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -46,7 +56,7 @@ export default function OverviewPage() {
         title="Visão Operacional"
         meta="O que está acontecendo na operação, agora."
       />
-      <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 space-y-8">
+      <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 space-y-9">
         {isEmpty && (
           <div className="rounded-lg border border-dashed border-cosmic-ink/20 bg-white/40 px-6 py-8 text-center">
             <p className="font-display font-semibold text-cosmic-ink mb-1">Nenhuma operação em andamento.</p>
@@ -54,13 +64,15 @@ export default function OverviewPage() {
               Comece criando o primeiro pedido — ele entra automaticamente na fila de planejamento.
             </p>
             <div className="flex items-center justify-center gap-2">
-              <button type="button"
+              <button
+                type="button"
                 onClick={() => setShowNewOrder(true)}
                 className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
               >
                 + Novo Pedido
               </button>
-              <button type="button"
+              <button
+                type="button"
                 onClick={loadDemoScenario}
                 className="rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium px-4 py-2 hover:bg-cosmic-ink/5 transition-colors"
               >
@@ -70,15 +82,20 @@ export default function OverviewPage() {
           </div>
         )}
 
-        <Section title="Status da Operação">
+        {/* 1. ESTADO ATUAL DA OPERAÇÃO */}
+        <Section title="Estado Atual da Operação">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <MiniStat label="Pedidos" value={metrics.orderCount} href="/orders" />
             <MiniStat label="Cargas" value={metrics.loadCount} href="/loads" />
             <MiniStat label="Viagens" value={metrics.shipmentCount} href="/shipments" />
             <MiniStat label="Entregas" value={metrics.deliveryCount} href="/deliveries" />
           </div>
-          {alerts.length > 0 && (
-            <div className="mt-3 space-y-2">
+        </Section>
+
+        {/* 2. ALERTAS E EXCEÇÕES */}
+        {alerts.length > 0 && (
+          <Section title="Alertas e Exceções">
+            <div className="space-y-2">
               {alerts.map((alert) =>
                 alert.href ? (
                   <Link
@@ -89,18 +106,16 @@ export default function OverviewPage() {
                     {alert.message}
                   </Link>
                 ) : (
-                  <div
-                    key={alert.id}
-                    className={`rounded-md border px-4 py-2.5 text-sm ${SEVERITY_STYLES[alert.severity]}`}
-                  >
+                  <div key={alert.id} className={`rounded-md border px-4 py-2.5 text-sm ${SEVERITY_STYLES[alert.severity]}`}>
                     {alert.message}
                   </div>
                 )
               )}
             </div>
-          )}
-        </Section>
+          </Section>
+        )}
 
+        {/* 3. OPERAÇÕES EM ANDAMENTO */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Section title="Viagens Ativas" href="/shipments" count={activeShipments.length}>
             <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
@@ -123,13 +138,13 @@ export default function OverviewPage() {
             </div>
           </Section>
 
-          <Section title="Ocorrências em Aberto" count={exceptions.length}>
+          <Section title="Ocorrências em Aberto" href="/occurrences" count={exceptions.length}>
             <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
               {exceptions.length === 0 && <EmptyRow text="Nenhuma ocorrência em aberto." />}
               {exceptions.map(({ occurrence, shipment }) => (
                 <Link
                   key={occurrence.id}
-                  href={shipment ? `/shipments/${shipment.id}` : "#"}
+                  href={shipment ? `/shipments/${shipment.id}` : "/occurrences"}
                   className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-cinnamon/5 transition-colors"
                 >
                   <div className="min-w-0">
@@ -148,25 +163,45 @@ export default function OverviewPage() {
               <QueueRow label="Cargas aguardando contratação" value={loadsAwaitingCarrier.length} href="/contratacao" />
             </div>
           </Section>
-
-          <Section title="Desempenho">
-            <div className="grid grid-cols-2 gap-3">
-              <MiniStat label="OTIF" value={metrics.otifPercent} suffix="%" />
-              <MiniStat label="OTD" value={metrics.otdPercent} suffix="%" />
-              <MiniStat label="Taxa de Ocupação" value={metrics.occupancyPercent} suffix="%" />
-              <MiniStat label="Custo por Entrega" value={metrics.costPerDelivery === null ? null : `R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`} />
-            </div>
-          </Section>
         </div>
 
-        <Section title="Atividade Recente">
+        {/* 4. INDICADORES PRINCIPAIS */}
+        <Section title="Indicadores Principais" href="/kpis">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MiniStat label="OTIF" value={metrics.otifPercent} suffix="%" />
+            <MiniStat label="OTD" value={metrics.otdPercent} suffix="%" />
+            <MiniStat label="Taxa de Ocupação" value={metrics.occupancyPercent} suffix="%" />
+            <MiniStat
+              label="Custo por Entrega"
+              value={metrics.costPerDelivery === null ? null : `R$ ${metrics.costPerDelivery.toLocaleString("pt-BR")}`}
+            />
+          </div>
+        </Section>
+
+        {/* 5. MOVIMENTAÇÕES RECENTES */}
+        <Section title="Movimentações Recentes">
           <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60">
-            {recentActivity.length === 0 && <EmptyRow text="Nenhuma atividade recente." />}
+            {recentActivity.length === 0 && <EmptyRow text="Nenhuma movimentação recente." />}
             {recentActivity.map((event) => (
               <div key={event.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
                 <p className="text-sm text-cosmic-ink/80">{event.label}</p>
                 <p className="text-xs text-cosmic-ink/45 tabular shrink-0">{timeAgo(event.timestamp)}</p>
               </div>
+            ))}
+          </div>
+        </Section>
+
+        {/* 6. ACESSO RÁPIDO ÀS ÁREAS OPERACIONAIS */}
+        <Section title="Acesso Rápido">
+          <div className="flex flex-wrap gap-2">
+            {QUICK_ACCESS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-full border border-cosmic-ink/15 text-cosmic-ink text-sm px-3.5 py-1.5 hover:border-blue-opal/40 hover:text-blue-opal transition-colors"
+              >
+                {item.label}
+              </Link>
             ))}
           </div>
         </Section>

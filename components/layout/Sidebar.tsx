@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { OrbitaMark } from "@/components/ui/OrbitaMark";
 
 interface NavItem {
   label: string;
@@ -93,9 +94,10 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:w-72 md:flex-col h-screen bg-cosmic-ink text-milk-mustache shrink-0">
       <div className="px-6 py-6 border-b border-white/10">
-        <Link href="/" className="block">
+        <Link href="/" className="flex items-center gap-2">
+          <OrbitaMark size={18} variant="inverted" />
           <span className="font-display font-semibold text-lg tracking-tight">
-            ÓRBITA <span className="text-rowdy-orange">TMS</span>
+            ÓRBITA <span className="text-blue-opal">TMS</span>
           </span>
         </Link>
       </div>
