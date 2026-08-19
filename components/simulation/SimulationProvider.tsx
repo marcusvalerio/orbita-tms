@@ -74,7 +74,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
           // Causa raiz de qualquer falha é sempre investigada — isto é só a
           // rede de segurança: a ação nunca deve corromper o estado nem
           // derrubar a interface. O estado anterior é preservado.
-          console.error("Falha ao processar ação da simulação:", action.type, err);
+          console.error("Falha ao processar ação da simulação:", { action, error: err });
           succeeded = false;
           return prev;
         }
