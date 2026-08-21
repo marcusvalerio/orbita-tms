@@ -2,6 +2,7 @@ import type {
   OperationDataset,
   Order,
   OrderItem,
+  CargoCharacteristic,
   Load,
   Shipment,
   Occurrence,
@@ -14,13 +15,35 @@ import type {
 } from "../domain/types";
 import type { TransportOptionQuote } from "../planning/quote";
 
+export interface NewOrderItemInput {
+  productId?: string;
+  description?: string;
+  quantity: number;
+  unitWeightKg: number;
+  volumeM3?: number;
+}
+
 export interface NewOrderInput {
   customerId: string;
   originId: string;
   destinationId: string;
-  totalWeightKg: number;
+  operationType: "B2B" | "B2C" | "Outro";
+  requestedBy?: string;
   priority: "Normal" | "Alta" | "Urgente";
+  generalNotes?: string;
+  pickupDate: string;
+  pickupWindowStart?: string;
+  pickupWindowEnd?: string;
   dueDate: string;
+  deliveryWindowStart?: string;
+  deliveryWindowEnd?: string;
+  destinationContactName?: string;
+  destinationContactPhone?: string;
+  items: NewOrderItemInput[];
+  cargoCharacteristics: CargoCharacteristic[];
+  temperatureMin?: number;
+  temperatureMax?: number;
+  temperatureNotes?: string;
 }
 
 export type SimulationAction =
@@ -59,25 +82,76 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
   switch (action.type) {
     case "CREATE_ORDER": {
       const { input } = action;
+
+      // Validações de domínio — não dependem só da UI (seção 23 do pedido).
+      if (input.items.length === 0) return state;
+      const hasInvalidItem = input.items.some(
+        (it) => it.quantity <= 0 || it.unitWeightKg <= 0 || (it.volumeM3 !== undefined && it.volumeM3 < 0)
+      );
+      if (hasInvalidItem) return state;
+      if (new Date(input.dueDate).getTime() < new Date(input.pickupDate).getTime()) return state;
+      if (
+        input.pickupWindowStart &&
+        input.pickupWindowEnd &&
+        input.pickupWindowEnd < input.pickupWindowStart
+      ) {
+        return state;
+      }
+      if (
+        input.deliveryWindowStart &&
+        input.deliveryWindowEnd &&
+        input.deliveryWindowEnd < input.deliveryWindowStart
+      ) {
+        return state;
+      }
+
       const [orderId, counters] = takeId(state.counters, "order", "PED");
 
-      const item: OrderItem = {
-        id: `${orderId}-item-1`,
-        productId: "prod-01",
-        quantity: 1,
-        weightKg: input.totalWeightKg,
-      };
+      const items: OrderItem[] = input.items.map((it, i) => {
+        const weightKg = Math.round(it.quantity * it.unitWeightKg * 100) / 100;
+        return {
+          id: `${orderId}-item-${i + 1}`,
+          productId: it.productId,
+          description: it.description,
+          quantity: it.quantity,
+          unitWeightKg: it.unitWeightKg,
+          weightKg,
+          volumeM3: it.volumeM3,
+        };
+      });
+      const totalWeightKg = Math.round(items.reduce((sum, it) => sum + it.weightKg, 0) * 100) / 100;
+      // Volume: soma o informado por item; para itens sem volume declarado, estima a partir do peso.
+      const totalVolumeM3 =
+        Math.round(
+          items.reduce((sum, it) => sum + (it.volumeM3 ?? it.weightKg / 140), 0) * 100
+        ) / 100;
+
       const order: Order = {
         id: orderId,
         originId: input.originId,
         destinationId: input.destinationId,
         customerId: input.customerId,
-        items: [item],
-        totalWeightKg: input.totalWeightKg,
-        totalVolumeM3: Math.round((input.totalWeightKg / 140) * 10) / 10,
+        items,
+        totalWeightKg,
+        totalVolumeM3,
         dueDate: input.dueDate,
         priority: input.priority,
         status: "Aguardando planejamento",
+        operationType: input.operationType,
+        requestedBy: input.requestedBy,
+        requestDate: new Date().toISOString(),
+        generalNotes: input.generalNotes,
+        pickupDate: input.pickupDate,
+        pickupWindowStart: input.pickupWindowStart,
+        pickupWindowEnd: input.pickupWindowEnd,
+        deliveryWindowStart: input.deliveryWindowStart,
+        deliveryWindowEnd: input.deliveryWindowEnd,
+        destinationContactName: input.destinationContactName,
+        destinationContactPhone: input.destinationContactPhone,
+        cargoCharacteristics: input.cargoCharacteristics,
+        temperatureMin: input.temperatureMin,
+        temperatureMax: input.temperatureMax,
+        temperatureNotes: input.temperatureNotes,
       };
 
       const [orderEvents, counters2] = withEvents(state.orderEvents, counters, [order.id], "Pedido criado e enviado para planejamento.");

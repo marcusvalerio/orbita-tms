@@ -23,6 +23,12 @@ export interface Location {
   kind: "CD" | "Cliente" | "Parceiro";
   lat: number;
   lng: number;
+  address?: string;
+  cep?: string;
+  complement?: string;
+  reference?: string;
+  contactName?: string;
+  contactPhone?: string;
 }
 
 export interface Customer {
@@ -78,10 +84,24 @@ export type OrderStatus =
 
 export interface OrderItem {
   id: ID;
-  productId: ID;
+  productId?: ID; // ausente quando o item não está no catálogo — usa `description`
+  description?: string;
   quantity: number;
-  weightKg: number;
+  unitWeightKg: number;
+  weightKg: number; // total do item = quantity × unitWeightKg
+  volumeM3?: number;
 }
+
+export type CargoCharacteristic =
+  | "Refrigerada"
+  | "Congelada"
+  | "Temperatura ambiente"
+  | "Frágil"
+  | "Alto valor"
+  | "Perigosa"
+  | "Perecível"
+  | "Sensível à umidade"
+  | "Manuseio especial";
 
 export interface Order {
   id: ID; // PED-10482
@@ -91,10 +111,29 @@ export interface Order {
   items: OrderItem[];
   totalWeightKg: number;
   totalVolumeM3: number;
-  dueDate: string; // ISO date
+  dueDate: string; // ISO date — data prevista de entrega
   priority: "Normal" | "Alta" | "Urgente";
   status: OrderStatus;
   loadId?: ID;
+  // Identificação da operação
+  operationType: "B2B" | "B2C" | "Outro";
+  requestedBy?: string;
+  requestDate: string; // ISO datetime
+  generalNotes?: string;
+  // Coleta
+  pickupDate: string; // ISO date
+  pickupWindowStart?: string; // HH:MM
+  pickupWindowEnd?: string; // HH:MM
+  // Entrega
+  deliveryWindowStart?: string; // HH:MM
+  deliveryWindowEnd?: string; // HH:MM
+  destinationContactName?: string;
+  destinationContactPhone?: string;
+  // Características da carga
+  cargoCharacteristics: CargoCharacteristic[];
+  temperatureMin?: number;
+  temperatureMax?: number;
+  temperatureNotes?: string;
 }
 
 export type LoadStatus =

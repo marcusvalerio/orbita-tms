@@ -226,15 +226,19 @@ export function generateAtlasOperation(): OperationDataset {
       pick(rng, customers);
     const itemCount = intBetween(rng, 1, 3);
     const items: OrderItem[] = Array.from({ length: itemCount }, (_, j) => {
-      const weight = intBetween(rng, 60, 900);
+      const quantity = intBetween(rng, 1, 40);
+      const unitWeightKg = Math.round((intBetween(rng, 60, 900) / quantity) * 10) / 10;
+      const weight = Math.round(quantity * unitWeightKg * 10) / 10;
       return {
         id: `item-${pad(i + 1, 3)}-${j + 1}`,
         productId: pick(rng, products).id,
-        quantity: intBetween(rng, 1, 40),
+        quantity,
+        unitWeightKg,
         weightKg: weight,
       };
     });
     const totalWeightKg = items.reduce((sum, it) => sum + it.weightKg, 0);
+    const pickupDate = isoDaysFromNow(intBetween(rng, -2, 0));
     return {
       id: `PED-${10480 + i}`,
       originId: origin.id,
@@ -246,6 +250,10 @@ export function generateAtlasOperation(): OperationDataset {
       dueDate: isoDaysFromNow(intBetween(rng, -1, 4)),
       priority: pick(rng, ["Normal", "Normal", "Normal", "Alta", "Urgente"] as const),
       status: pick(rng, orderStatusPool),
+      operationType: pick(rng, ["B2B", "B2C", "B2C"] as const),
+      requestDate: pickupDate,
+      pickupDate,
+      cargoCharacteristics: [],
     };
   });
 
