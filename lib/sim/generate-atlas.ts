@@ -584,6 +584,8 @@ export function generateAtlasOperation(): OperationDataset {
     documents,
     kpiHistory,
     orderEvents: [],
-    counters: { order: 1, load: 1, shipment: 1, delivery: 1, occurrence: 1, document: 1, pod: 1, event: 1 },
+    counters: { order: 1, load: 1, shipment: 1, delivery: 1, occurrence: 1, document: 1, pod: 1, event: 1, partner: 1, solicitation: 1 },
+    partnerCompanies: [],
+    solicitations: [],
   };
 }

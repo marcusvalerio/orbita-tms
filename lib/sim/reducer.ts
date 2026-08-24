@@ -12,6 +12,8 @@ import type {
   TmsDocument,
   OrderEvent,
   EntityCounters,
+  PartnerCompany,
+  Solicitation,
 } from "../domain/types";
 import type { TransportOptionQuote } from "../planning/quote";
 
@@ -46,6 +48,53 @@ export interface NewOrderInput {
   temperatureNotes?: string;
 }
 
+export interface NewPartnerCompanyInput {
+  legalName: string;
+  tradeName?: string;
+  cnpj?: string;
+  responsibleName?: string;
+  phone?: string;
+  email?: string;
+  cep?: string;
+  address?: string;
+  addressNumber?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  notes?: string;
+}
+
+export interface NewSolicitationInput {
+  partnerCompanyId: string;
+  requestedBy?: string;
+  contact?: string;
+  operationType: "B2B" | "B2C";
+  originId: string;
+  destinationId: string;
+  pickupDate: string;
+  pickupWindowStart?: string;
+  pickupWindowEnd?: string;
+  deliveryDate: string;
+  deliveryWindowStart?: string;
+  deliveryWindowEnd?: string;
+  destinationContactName?: string;
+  destinationContactPhone?: string;
+  productDescription: string;
+  quantity: number;
+  totalWeightKg: number;
+  totalVolumeM3?: number;
+  unit?: string;
+  cargoCharacteristics: CargoCharacteristic[];
+  temperatureMin?: number;
+  temperatureMax?: number;
+  temperatureNotes?: string;
+  nfeNumber?: string;
+  romaneioNumber?: string;
+  otherDocuments?: string;
+  notes?: string;
+}
+
 export type SimulationAction =
   | { type: "CREATE_ORDER"; input: NewOrderInput }
   | { type: "CREATE_LOAD"; orderIds: string[] }
@@ -53,7 +102,11 @@ export type SimulationAction =
   | { type: "START_SHIPMENT"; shipmentId: string }
   | { type: "CREATE_OCCURRENCE"; shipmentId: string; occurrenceType: OccurrenceType }
   | { type: "RESOLVE_OCCURRENCE"; occurrenceId: string; action: OccurrenceAction }
-  | { type: "COMPLETE_DELIVERY"; shipmentId: string };
+  | { type: "COMPLETE_DELIVERY"; shipmentId: string }
+  | { type: "CREATE_PARTNER_COMPANY"; input: NewPartnerCompanyInput }
+  | { type: "REGENERATE_PARTNER_CODE"; partnerCompanyId: string }
+  | { type: "CREATE_SOLICITATION"; input: NewSolicitationInput }
+  | { type: "CONVERT_SOLICITATION_TO_ORDER"; solicitationId: string; customerId: string; priority: "Normal" | "Alta" | "Urgente" };
 
 /** Gera o próximo ID sequencial de um tipo de entidade e retorna os contadores atualizados. */
 function takeId(counters: EntityCounters, key: keyof EntityCounters, prefix: string): [string, EntityCounters] {
@@ -388,9 +441,135 @@ export function reduce(state: OperationDataset, action: SimulationAction): Opera
       };
     }
 
+    case "CREATE_PARTNER_COMPANY": {
+      const [partnerId, counters] = takeId(state.counters, "partner", "PAR");
+      const accessCode = generateAccessCode(action.input.legalName, state.partnerCompanies);
+      const partner: PartnerCompany = {
+        id: partnerId,
+        ...action.input,
+        status: "Ativa",
+        accessCode,
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        partnerCompanies: [...state.partnerCompanies, partner],
+        counters,
+      };
+    }
+
+    case "REGENERATE_PARTNER_CODE": {
+      const partner = state.partnerCompanies.find((p) => p.id === action.partnerCompanyId);
+      if (!partner) return state;
+      const accessCode = generateAccessCode(partner.legalName, state.partnerCompanies);
+      return {
+        ...state,
+        partnerCompanies: state.partnerCompanies.map((p) =>
+          p.id === partner.id ? { ...p, accessCode } : p
+        ),
+      };
+    }
+
+    case "CREATE_SOLICITATION": {
+      const { input } = action;
+      if (input.quantity <= 0 || input.totalWeightKg <= 0) return state;
+      if (new Date(input.deliveryDate).getTime() < new Date(input.pickupDate).getTime()) return state;
+
+      const [solicitationId, counters] = takeId(state.counters, "solicitation", "SOL");
+      const solicitation: Solicitation = {
+        id: solicitationId,
+        ...input,
+        status: "Solicitada",
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        solicitations: [...state.solicitations, solicitation],
+        counters,
+      };
+    }
+
+    case "CONVERT_SOLICITATION_TO_ORDER": {
+      const solicitation = state.solicitations.find((s) => s.id === action.solicitationId);
+      if (!solicitation || solicitation.status === "Convertida em Pedido") return state;
+
+      const [orderId, counters] = takeId(state.counters, "order", "PED");
+      const item: OrderItem = {
+        id: `${orderId}-item-1`,
+        description: solicitation.productDescription,
+        quantity: solicitation.quantity,
+        unitWeightKg: Math.round((solicitation.totalWeightKg / solicitation.quantity) * 100) / 100,
+        weightKg: solicitation.totalWeightKg,
+        volumeM3: solicitation.totalVolumeM3,
+      };
+      const order: Order = {
+        id: orderId,
+        originId: solicitation.originId,
+        destinationId: solicitation.destinationId,
+        customerId: action.customerId,
+        items: [item],
+        totalWeightKg: solicitation.totalWeightKg,
+        totalVolumeM3: solicitation.totalVolumeM3 ?? Math.round((solicitation.totalWeightKg / 140) * 100) / 100,
+        dueDate: solicitation.deliveryDate,
+        priority: action.priority,
+        status: "Aguardando planejamento",
+        operationType: solicitation.operationType,
+        requestedBy: solicitation.requestedBy,
+        requestDate: solicitation.createdAt,
+        generalNotes: solicitation.notes,
+        pickupDate: solicitation.pickupDate,
+        pickupWindowStart: solicitation.pickupWindowStart,
+        pickupWindowEnd: solicitation.pickupWindowEnd,
+        deliveryWindowStart: solicitation.deliveryWindowStart,
+        deliveryWindowEnd: solicitation.deliveryWindowEnd,
+        destinationContactName: solicitation.destinationContactName,
+        destinationContactPhone: solicitation.destinationContactPhone,
+        cargoCharacteristics: solicitation.cargoCharacteristics,
+        temperatureMin: solicitation.temperatureMin,
+        temperatureMax: solicitation.temperatureMax,
+        temperatureNotes: solicitation.temperatureNotes,
+      };
+
+      const [orderEvents, counters2] = withEvents(
+        state.orderEvents,
+        counters,
+        [order.id],
+        `Pedido originado da solicitação ${solicitation.id}.`
+      );
+
+      return {
+        ...state,
+        orders: [...state.orders, order],
+        solicitations: state.solicitations.map((s) =>
+          s.id === solicitation.id ? { ...s, status: "Convertida em Pedido", orderId: order.id } : s
+        ),
+        orderEvents,
+        counters: counters2,
+      };
+    }
+
     default:
       return state;
   }
+}
+
+/** Código de acesso provisório ao Portal do Parceiro — memorável, não é o ID interno, único por operação. */
+function generateAccessCode(legalName: string, existing: PartnerCompany[]): string {
+  const initials = legalName
+    .toUpperCase()
+    .replace(/[^A-ZÀ-Ú\s]/g, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 3) || "PAR";
+
+  let code = "";
+  do {
+    const digits = Math.floor(1000 + Math.random() * 9000);
+    code = `${initials}-${digits}`;
+  } while (existing.some((p) => p.accessCode === code));
+  return code;
 }
 
 export function toastForAction(action: SimulationAction): string {
@@ -409,6 +588,14 @@ export function toastForAction(action: SimulationAction): string {
       return `Ocorrência resolvida: ${action.action}.`;
     case "COMPLETE_DELIVERY":
       return "Entrega concluída — POD gerado.";
+    case "CREATE_PARTNER_COMPANY":
+      return "Empresa parceira cadastrada — código de acesso gerado.";
+    case "REGENERATE_PARTNER_CODE":
+      return "Código de acesso regenerado.";
+    case "CREATE_SOLICITATION":
+      return "Solicitação enviada para análise.";
+    case "CONVERT_SOLICITATION_TO_ORDER":
+      return "Solicitação convertida em pedido.";
     default:
       return "";
   }

@@ -17,13 +17,18 @@ const STORAGE_KEY = "orbita-tms-simulation-v1";
  *        entidade: PED-00001, CAR-00001 etc.) e `orderEvents` (histórico
  *        por pedido). Migração v1→v2 preenche esses campos com valores
  *        neutros quando ausentes.
+ *   v3 → adiciona `partnerCompanies` (empresas parceiras/solicitantes) e
+ *        `solicitations` (solicitações de transporte enviadas pelo Portal
+ *        do Parceiro, antes de virarem Pedido), mais os contadores
+ *        `partner`/`solicitation`. Migração v2→v3 preenche com arrays
+ *        vazios e contadores iniciados em 1 quando ausentes.
  *
  * Comportamento para estado corrompido ou incompatível de forma
  * irrecuperável: é descartado silenciosamente (log de desenvolvimento via
  * console.warn) e a aplicação inicializa um dataset vazio válido — nunca
  * repassa um objeto inválido ao reducer.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 interface PersistedEnvelope {
   schemaVersion: number;
@@ -39,6 +44,8 @@ const EMPTY_COUNTERS: EntityCounters = {
   document: 1,
   pod: 1,
   event: 1,
+  partner: 1,
+  solicitation: 1,
 };
 
 const REQUIRED_ARRAY_FIELDS: (keyof OperationDataset)[] = [
@@ -59,6 +66,8 @@ const REQUIRED_ARRAY_FIELDS: (keyof OperationDataset)[] = [
   "documents",
   "kpiHistory",
   "orderEvents",
+  "partnerCompanies",
+  "solicitations",
 ];
 
 const REQUIRED_COUNTER_FIELDS: (keyof EntityCounters)[] = [
@@ -70,6 +79,8 @@ const REQUIRED_COUNTER_FIELDS: (keyof EntityCounters)[] = [
   "document",
   "pod",
   "event",
+  "partner",
+  "solicitation",
 ];
 
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
@@ -82,6 +93,23 @@ const MIGRATIONS: Record<number, Migration> = {
     counters:
       data.counters && typeof data.counters === "object" ? data.counters : { ...EMPTY_COUNTERS },
   }),
+  2: (data) => {
+    const counters =
+      data.counters && typeof data.counters === "object"
+        ? (data.counters as Record<string, unknown>)
+        : {};
+    return {
+      ...data,
+      partnerCompanies: Array.isArray(data.partnerCompanies) ? data.partnerCompanies : [],
+      solicitations: Array.isArray(data.solicitations) ? data.solicitations : [],
+      counters: {
+        ...EMPTY_COUNTERS,
+        ...counters,
+        partner: typeof counters.partner === "number" ? counters.partner : 1,
+        solicitation: typeof counters.solicitation === "number" ? counters.solicitation : 1,
+      },
+    };
+  },
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

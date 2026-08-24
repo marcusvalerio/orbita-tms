@@ -343,6 +343,8 @@ export interface OperationDataset {
   kpiHistory: KpiSnapshot[];
   orderEvents: OrderEvent[];
   counters: EntityCounters;
+  partnerCompanies: PartnerCompany[];
+  solicitations: Solicitation[];
 }
 
 export interface OrderEvent {
@@ -362,4 +364,65 @@ export interface EntityCounters {
   document: number;
   pod: number;
   event: number;
+  partner: number;
+  solicitation: number;
+}
+
+/** Empresa parceira — quem contrata a operadora e solicita transportes. */
+export interface PartnerCompany {
+  id: ID;
+  legalName: string;
+  tradeName?: string;
+  cnpj?: string;
+  responsibleName?: string;
+  phone?: string;
+  email?: string;
+  cep?: string;
+  address?: string;
+  addressNumber?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  notes?: string;
+  status: "Ativa" | "Inativa";
+  accessCode: string; // ex: FSC-4821 — mecanismo provisório de acesso ao Portal do Parceiro
+  createdAt: string;
+}
+
+export type SolicitationStatus = "Solicitada" | "Em análise" | "Convertida em Pedido" | "Recusada";
+
+/** Solicitação enviada pelo parceiro — origem da demanda, antes de virar Pedido/Ordem de Serviço. */
+export interface Solicitation {
+  id: ID; // SOL-00001
+  partnerCompanyId: ID;
+  requestedBy?: string;
+  contact?: string;
+  operationType: "B2B" | "B2C";
+  originId: ID;
+  destinationId: ID;
+  pickupDate: string;
+  pickupWindowStart?: string;
+  pickupWindowEnd?: string;
+  deliveryDate: string;
+  deliveryWindowStart?: string;
+  deliveryWindowEnd?: string;
+  destinationContactName?: string;
+  destinationContactPhone?: string;
+  productDescription: string;
+  quantity: number;
+  totalWeightKg: number;
+  totalVolumeM3?: number;
+  unit?: string;
+  cargoCharacteristics: CargoCharacteristic[];
+  temperatureMin?: number;
+  temperatureMax?: number;
+  temperatureNotes?: string;
+  nfeNumber?: string;
+  romaneioNumber?: string;
+  otherDocuments?: string;
+  notes?: string;
+  status: SolicitationStatus;
+  orderId?: ID;
+  createdAt: string;
 }

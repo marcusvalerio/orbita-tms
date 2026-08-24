@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { OperationDataset, OccurrenceType, OccurrenceAction } from "@/lib/domain/types";
 import { generateEmptyOperation } from "@/lib/sim/generate-empty";
 import { generateAtlasOperation } from "@/lib/sim/generate-atlas";
-import { reduce, toastForAction, type SimulationAction, type NewOrderInput } from "@/lib/sim/reducer";
+import { reduce, toastForAction, type SimulationAction, type NewOrderInput, type NewPartnerCompanyInput, type NewSolicitationInput } from "@/lib/sim/reducer";
 import { loadPersistedState, persistState, clearPersistedState } from "@/lib/sim/persistence";
 import type { TransportOptionQuote } from "@/lib/planning/quote";
 
@@ -25,6 +25,10 @@ interface SimulationContextValue {
   completeDelivery: (shipmentId: string) => void;
   resetSimulation: () => void;
   loadDemoScenario: () => void;
+  createPartnerCompany: (input: NewPartnerCompanyInput) => void;
+  regeneratePartnerCode: (partnerCompanyId: string) => void;
+  createSolicitation: (input: NewSolicitationInput) => void;
+  convertSolicitationToOrder: (solicitationId: string, customerId: string, priority: "Normal" | "Alta" | "Urgente") => void;
   toasts: Toast[];
 }
 
@@ -119,6 +123,24 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     pushToast("Cenário de demonstração carregado.");
   }, [pushToast]);
 
+  const createPartnerCompany = useCallback(
+    (input: NewPartnerCompanyInput) => dispatch({ type: "CREATE_PARTNER_COMPANY", input }),
+    [dispatch]
+  );
+  const regeneratePartnerCode = useCallback(
+    (partnerCompanyId: string) => dispatch({ type: "REGENERATE_PARTNER_CODE", partnerCompanyId }),
+    [dispatch]
+  );
+  const createSolicitation = useCallback(
+    (input: NewSolicitationInput) => dispatch({ type: "CREATE_SOLICITATION", input }),
+    [dispatch]
+  );
+  const convertSolicitationToOrder = useCallback(
+    (solicitationId: string, customerId: string, priority: "Normal" | "Alta" | "Urgente") =>
+      dispatch({ type: "CONVERT_SOLICITATION_TO_ORDER", solicitationId, customerId, priority }),
+    [dispatch]
+  );
+
   if (!data) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-milk-mustache text-cosmic-ink/40 text-sm">
@@ -143,6 +165,10 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
         completeDelivery,
         resetSimulation,
         loadDemoScenario,
+        createPartnerCompany,
+        regeneratePartnerCode,
+        createSolicitation,
+        convertSolicitationToOrder,
         toasts,
       }}
     >
