@@ -156,8 +156,8 @@ export default function ShipmentDetailPage() {
 
         {/* DETAILS */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <DetailField label="Veículo" value={vehicle ? `${vehicle.id} · ${vehicle.type}` : "—"} />
-          <DetailField label="Motorista responsável" value={driver?.name ?? "—"} />
+          <DetailField label="Veículo" value={vehicle ? `${vehicle.id} · ${vehicle.type}` : shipment.carrierId ? "Da transportadora" : "—"} />
+          <DetailField label="Motorista responsável" value={driver?.name ?? (shipment.carrierId ? "Da transportadora" : "—")} />
           <DetailField label="Transportadora" value={carrier?.name ?? "Frota Própria"} />
           <DetailField label="Carga" value={load?.id ?? "—"} />
         </section>

@@ -1,6 +1,6 @@
 // ÓRBITA TMS — Modelo de domínio
-// Tipos e relações centrais da operação logística simulada.
-// Nenhum dado real. Nenhuma persistência real. Apenas contratos de domínio.
+// Tipos e relações centrais da operação logística. Contratos puros: não
+// dependem de banco, provider de mapa, autenticação nem framework.
 
 export type ID = string;
 
@@ -75,12 +75,15 @@ export interface Carrier {
 // Ciclo operacional: Pedido → Carga → Viagem → Entrega
 // ---------------------------------------------------------------------------
 
-export type OrderStatus =
-  | "Aguardando planejamento"
-  | "Planejado"
-  | "Em transporte"
-  | "Entregue"
-  | "Com ocorrência";
+export const ORDER_STATUSES = [
+  "Aguardando planejamento",
+  "Planejado",
+  "Em transporte",
+  "Entregue",
+  "Com ocorrência",
+  "Devolvido",
+] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export interface OrderItem {
   id: ID;
@@ -92,16 +95,18 @@ export interface OrderItem {
   volumeM3?: number;
 }
 
-export type CargoCharacteristic =
-  | "Refrigerada"
-  | "Congelada"
-  | "Temperatura ambiente"
-  | "Frágil"
-  | "Alto valor"
-  | "Perigosa"
-  | "Perecível"
-  | "Sensível à umidade"
-  | "Manuseio especial";
+export const CARGO_CHARACTERISTICS = [
+  "Refrigerada",
+  "Congelada",
+  "Temperatura ambiente",
+  "Frágil",
+  "Alto valor",
+  "Perigosa",
+  "Perecível",
+  "Sensível à umidade",
+  "Manuseio especial",
+] as const;
+export type CargoCharacteristic = (typeof CARGO_CHARACTERISTICS)[number];
 
 export interface Order {
   id: ID; // PED-10482
@@ -136,12 +141,14 @@ export interface Order {
   temperatureNotes?: string;
 }
 
-export type LoadStatus =
-  | "Em consolidação"
-  | "Aguardando transporte"
-  | "Contratada"
-  | "Em viagem"
-  | "Concluída";
+export const LOAD_STATUSES = [
+  "Em consolidação",
+  "Aguardando transporte",
+  "Contratada",
+  "Em viagem",
+  "Concluída",
+] as const;
+export type LoadStatus = (typeof LOAD_STATUSES)[number];
 
 export interface Load {
   id: ID; // LOAD-00381
@@ -172,58 +179,73 @@ export interface Tender {
   selectedOptionId?: ID;
 }
 
-export type ShipmentStatus =
-  | "Planned"
-  | "Awaiting Pickup"
-  | "Pickup Completed"
-  | "In Transit"
-  | "At Delivery"
-  | "Delivered"
-  | "Closed"
-  | "Exception";
+export const SHIPMENT_STATUSES = [
+  "Planned",
+  "Awaiting Pickup",
+  "Pickup Completed",
+  "In Transit",
+  "At Delivery",
+  "Delivered",
+  "Closed",
+  "Exception",
+] as const;
+export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
 
 export interface Stop {
   id: ID;
   locationId: ID;
   sequence: number;
   kind: "Coleta" | "Entrega";
-  plannedTime: string;
+  plannedTime: string; // ISO — chegada planejada
   actualTime?: string;
+  orderIds?: ID[]; // pedidos atendidos nesta parada (paradas de entrega)
+  windowStart?: string; // ISO — janela de atendimento combinada com o cliente
+  windowEnd?: string;
+  serviceMinutes?: number; // tempo previsto de descarga/atendimento
 }
 
 export interface Shipment {
-  id: ID; // SHIP-000381
+  id: ID; // VIA-00001
+  routeCode?: string; // código operacional da rota, ex.: RJ-ZONA-OESTE-042
   loadId: ID;
-  carrierId: ID;
-  vehicleId: ID;
-  driverId: ID;
+  /** Transportadora contratada; ausente quando a viagem é de frota própria. */
+  carrierId?: ID;
+  /** Veículo e motorista da frota; ausentes quando a transportadora os fornece. */
+  vehicleId?: ID;
+  driverId?: ID;
   originId: ID;
   destinationId: ID;
   departureTime: string;
   etaTime: string;
   status: ShipmentStatus;
   stops: Stop[];
+  plannedDistanceKm?: number; // estimativa de planejamento (ver lib/domain/geo)
+  plannedDurationMin?: number;
   occurrenceIds: ID[];
   deliveryId?: ID;
 }
 
-export type OccurrenceType =
-  | "Atraso"
-  | "Avaria"
-  | "Destinatário ausente"
-  | "Endereço incorreto"
-  | "Problema mecânico"
-  | "Acidente"
-  | "Extravio"
-  | "Roubo"
-  | "Recusa"
-  | "Devolução";
+export const OCCURRENCE_TYPES = [
+  "Atraso",
+  "Avaria",
+  "Destinatário ausente",
+  "Endereço incorreto",
+  "Problema mecânico",
+  "Acidente",
+  "Extravio",
+  "Roubo",
+  "Recusa",
+  "Devolução",
+] as const;
+export type OccurrenceType = (typeof OCCURRENCE_TYPES)[number];
 
-export type OccurrenceAction =
-  | "Reagendar"
-  | "Nova tentativa"
-  | "Devolver"
-  | "Contatar cliente";
+export const OCCURRENCE_ACTIONS = [
+  "Reagendar",
+  "Nova tentativa",
+  "Devolver",
+  "Contatar cliente",
+] as const;
+export type OccurrenceAction = (typeof OCCURRENCE_ACTIONS)[number];
 
 export interface Occurrence {
   id: ID;
@@ -232,15 +254,18 @@ export interface Occurrence {
   description: string;
   reportedAt: string;
   resolved: boolean;
+  resolvedAt?: string;
   action?: OccurrenceAction;
   severity: "Baixa" | "Média" | "Crítica";
 }
 
-export type DeliveryResult =
-  | "Delivered"
-  | "Partial Delivery"
-  | "Failed"
-  | "Returned";
+export const DELIVERY_RESULTS = [
+  "Delivered",
+  "Partial Delivery",
+  "Failed",
+  "Returned",
+] as const;
+export type DeliveryResult = (typeof DELIVERY_RESULTS)[number];
 
 export interface Delivery {
   id: ID;
@@ -281,7 +306,8 @@ export interface Rate {
 export interface Freight {
   id: ID;
   shipmentId: ID;
-  rateId: ID;
+  rateId?: ID; // ausente quando o frete veio de cotação e não de tabela
+  label?: string; // opção contratada (ex.: "Frota Própria", "RioLog")
   baseCost: number;
   toll: number;
   gris: number;
@@ -290,13 +316,15 @@ export interface Freight {
   totalCost: number;
 }
 
-export type DocumentType =
-  | "Ordem de Transporte"
-  | "Romaneio"
-  | "NF-e"
-  | "CT-e"
-  | "MDF-e"
-  | "POD";
+export const DOCUMENT_TYPES = [
+  "Ordem de Transporte",
+  "Romaneio",
+  "NF-e",
+  "CT-e",
+  "MDF-e",
+  "POD",
+] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 export interface TmsDocument {
   id: ID; // SIM-000381
@@ -390,7 +418,8 @@ export interface PartnerCompany {
   createdAt: string;
 }
 
-export type SolicitationStatus = "Solicitada" | "Em análise" | "Convertida em Pedido" | "Recusada";
+export const SOLICITATION_STATUSES = ["Solicitada", "Em análise", "Convertida em Pedido", "Recusada"] as const;
+export type SolicitationStatus = (typeof SOLICITATION_STATUSES)[number];
 
 /** Solicitação enviada pelo parceiro — origem da demanda, antes de virar Pedido/Ordem de Serviço. */
 export interface Solicitation {

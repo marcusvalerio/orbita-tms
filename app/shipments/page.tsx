@@ -37,7 +37,7 @@ export default function ShipmentsPage() {
               {shipments.map((shipment) => {
                 const origin = locationById.get(shipment.originId);
                 const destination = locationById.get(shipment.destinationId);
-                const carrier = carrierById.get(shipment.carrierId);
+                const carrier = shipment.carrierId ? carrierById.get(shipment.carrierId) : undefined;
                 return (
                   <tr key={shipment.id} className="border-b border-cosmic-ink/5 last:border-0 hover:bg-blue-opal/5 transition-colors">
                     <td className="px-4 py-3">
