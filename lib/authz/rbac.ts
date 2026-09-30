@@ -113,3 +113,12 @@ export function authorizeCommand(actor: Actor, action: SimulationAction): Author
   }
   return { ok: true };
 }
+
+/** Pessoa fictícia do Modo Demo (sem login): administrador da operação no navegador. */
+export const DEMO_ACTOR: Actor = {
+  userId: "demo",
+  email: "demo@orbita.local",
+  name: "Operador de demonstração",
+  tenantId: "atlas",
+  role: "administrador",
+};

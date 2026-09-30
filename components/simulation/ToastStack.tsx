@@ -1,9 +1,9 @@
 "use client";
 
-import { useSimulation } from "./SimulationProvider";
+import { useOperation } from "@/components/operation/OperationProvider";
 
 export function ToastStack() {
-  const { toasts } = useSimulation();
+  const { toasts } = useOperation();
 
   if (toasts.length === 0) return null;
 

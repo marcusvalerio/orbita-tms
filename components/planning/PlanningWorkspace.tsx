@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Order, Location, Carrier, Vehicle } from "@/lib/domain/types";
 import { analyzePlanning, explainPlan, type PlanOption } from "@/lib/planning/plans";
-import { useSimulation } from "@/components/simulation/SimulationProvider";
+import { useOperation } from "@/components/operation/OperationProvider";
 
 export function PlanningWorkspace({
   orders,
@@ -19,20 +19,14 @@ export function PlanningWorkspace({
   vehicles: Vehicle[];
   preselectedOrderId?: string | null;
 }) {
-  const { data, createLoad, createShipment } = useSimulation();
+  const { createLoad, createShipment } = useOperation();
   const router = useRouter();
 
   const [selectedIds, setSelectedIds] = useState<string[]>(preselectedOrderId ? [preselectedOrderId] : []);
   const [analyzed, setAnalyzed] = useState(false);
   const [chosenPlanKey, setChosenPlanKey] = useState<PlanOption["key"] | null>(null);
   const [expandedReasons, setExpandedReasons] = useState<PlanOption["key"] | null>(null);
-  const [pendingLoadKey, setPendingLoadKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (preselectedOrderId && orders.some((o) => o.id === preselectedOrderId)) {
-      setSelectedIds([preselectedOrderId]);
-    }
-  }, [preselectedOrderId, orders]);
+  const [submitting, setSubmitting] = useState(false);
 
   const toggle = (orderId: string) => {
     if (analyzed) return;
@@ -49,7 +43,8 @@ export function PlanningWorkspace({
   const compatibleOrderIds = new Set(
     referenceOrder
       ? orders
-          .filter((o) => o.originId === referenceOrder.originId && o.destinationId === referenceOrder.destinationId)
+          // Mesma origem: destinos diferentes viram paradas de uma rota de distribuição.
+          .filter((o) => o.originId === referenceOrder.originId)
           .map((o) => o.id)
       : orders.map((o) => o.id)
   );
@@ -61,36 +56,30 @@ export function PlanningWorkspace({
 
   const chosenPlan = analysis?.plans.find((p) => p.key === chosenPlanKey) ?? null;
 
-  const createdLoad = pendingLoadKey
-    ? data.loads.find((l) => [...l.orderIds].sort().join(",") === pendingLoadKey)
-    : undefined;
-
   const handleReset = () => {
     setAnalyzed(false);
     setChosenPlanKey(null);
     setExpandedReasons(null);
-    setPendingLoadKey(null);
   };
 
-  const handleConfirmPlan = () => {
-    if (!chosenPlan) return;
-    const key = [...chosenPlan.orderIds].sort().join(",");
-    setPendingLoadKey(key);
-    createLoad(chosenPlan.orderIds);
+  // Confirmar plano = formar a carga e contratar a opção escolhida, em sequência.
+  // Cada passo é validado pelo domínio (e, em produção, pelo servidor).
+  const handleConfirmPlan = async () => {
+    if (!chosenPlan || submitting) return;
+    setSubmitting(true);
+    try {
+      const loaded = await createLoad(chosenPlan.orderIds);
+      if (!loaded.ok) return;
+      const load = loaded.data.loads.find((l) => chosenPlan.orderIds.every((id) => l.orderIds.includes(id)) && !l.shipmentId);
+      if (!load) return;
+      const contracted = await createShipment(load.id, chosenPlan.transportOption);
+      if (!contracted.ok) return;
+      const shipment = contracted.data.shipments.find((s) => s.loadId === load.id);
+      if (shipment) router.push(`/shipments/${shipment.id}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  // Depois que a carga é criada, dispara a contratação da opção do plano escolhido.
-  useEffect(() => {
-    if (createdLoad && chosenPlan && !createdLoad.shipmentId) {
-      createShipment(createdLoad.id, chosenPlan.transportOption);
-    }
-  }, [createdLoad, chosenPlan, createShipment]);
-
-  useEffect(() => {
-    if (createdLoad?.shipmentId) {
-      router.push(`/shipments/${createdLoad.shipmentId}`);
-    }
-  }, [createdLoad, router]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 flex-1 min-h-0 overflow-hidden divide-x divide-cosmic-ink/10">
@@ -279,10 +268,11 @@ export function PlanningWorkspace({
                 </button>
                 <button type="button"
                   onClick={handleConfirmPlan}
-                  disabled={!!pendingLoadKey}
+                  disabled={submitting}
+                  aria-busy={submitting}
                   className="flex-1 rounded-md bg-blue-opal text-white text-sm font-medium py-2 hover:bg-blue-opal/90 transition-colors disabled:opacity-50"
                 >
-                  Confirmar Planejamento
+                  {submitting ? "Confirmando…" : "Confirmar Planejamento"}
                 </button>
               </div>
             </div>

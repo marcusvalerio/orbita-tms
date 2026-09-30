@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useSimulation } from "./SimulationProvider";
+import { useOperation } from "@/components/operation/OperationProvider";
 import type { CargoCharacteristic } from "@/lib/domain/types";
 import type { NewOrderItemInput } from "@/lib/sim/reducer";
 
@@ -30,7 +30,7 @@ function daysFromNowIso(days: number) {
 }
 
 export function NewOrderModal({ onClose }: { onClose: () => void }) {
-  const { data, createOrder } = useSimulation();
+  const { data, createOrder } = useOperation();
   const cds = data.locations.filter((l) => l.kind === "CD");
   const clientLocations = data.locations.filter((l) => l.kind === "Cliente");
 
@@ -80,7 +80,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
     setCharacteristics((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -101,7 +101,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    createOrder({
+    const outcome = await createOrder({
       customerId,
       originId,
       destinationId,
@@ -109,10 +109,10 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
       requestedBy: requestedBy || undefined,
       priority,
       generalNotes: generalNotes || undefined,
-      pickupDate: new Date(pickupDate).toISOString(),
+      pickupDate,
       pickupWindowStart: pickupWindowStart || undefined,
       pickupWindowEnd: pickupWindowEnd || undefined,
-      dueDate: new Date(dueDate).toISOString(),
+      dueDate,
       deliveryWindowStart: deliveryWindowStart || undefined,
       deliveryWindowEnd: deliveryWindowEnd || undefined,
       destinationContactName: destinationContactName || undefined,
@@ -123,7 +123,8 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
       temperatureMax: needsTemperature ? temperatureMax : undefined,
       temperatureNotes: needsTemperature ? temperatureNotes || undefined : undefined,
     });
-    onClose();
+    if (outcome.ok) onClose();
+    else setError(outcome.error);
   };
 
   return (

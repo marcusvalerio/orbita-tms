@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSimulation } from "./SimulationProvider";
+import { useOperation } from "@/components/operation/OperationProvider";
 
 interface SearchResult {
   id: string;
@@ -23,7 +23,7 @@ export function GlobalSearch({
   autoFocus?: boolean;
   onNavigate?: () => void;
 } = {}) {
-  const { data } = useSimulation();
+  const { data } = useOperation();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(!!autoFocus);

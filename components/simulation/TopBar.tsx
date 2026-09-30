@@ -5,10 +5,13 @@ import Link from "next/link";
 import { GlobalSearch } from "./GlobalSearch";
 import { NewOrderModal } from "./NewOrderModal";
 import { OrbitaMark } from "@/components/ui/OrbitaMark";
+import { useOperation } from "@/components/operation/OperationProvider";
+import { signOut } from "@/app/auth/actions";
 
 export function TopBar() {
   const [showSearch, setShowSearch] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const { mode, actor, roleLabel, can, pending } = useOperation();
 
   return (
     <>
@@ -21,6 +24,20 @@ export function TopBar() {
         </Link>
 
         <div className="flex items-center gap-2 shrink-0">
+          {mode === "demo" ? (
+            <span
+              className="hidden sm:inline-flex items-center rounded-full border border-cosmic-ink/20 px-2.5 py-1 text-xs font-medium text-cosmic-ink/80"
+              title="Operação no navegador, sem banco de dados. Dados de demonstração."
+            >
+              Modo Demo
+            </span>
+          ) : (
+            <span className="hidden sm:flex items-center gap-2 text-xs text-cosmic-ink/80" title={actor.email}>
+              {pending && <span className="text-cosmic-ink/60" role="status">Salvando…</span>}
+              <span className="font-medium text-cosmic-ink">{actor.name}</span>
+              <span className="rounded-full bg-cosmic-ink/8 px-2 py-0.5">{roleLabel}</span>
+            </span>
+          )}
           <div className="relative">
             <button type="button"
               onClick={() => setShowSearch((v) => !v)}
@@ -37,6 +54,7 @@ export function TopBar() {
             )}
           </div>
 
+          {can("orders:create") && (
           <button type="button"
             onClick={() => setShowNewOrder(true)}
             aria-label="Novo Pedido"
@@ -45,6 +63,17 @@ export function TopBar() {
           >
             <PlusIcon />
           </button>
+          )}
+          {mode === "production" && (
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="h-8 rounded-full border border-cosmic-ink/15 px-3 text-xs font-medium text-cosmic-ink hover:bg-cosmic-ink/5 transition-colors"
+              >
+                Sair
+              </button>
+            </form>
+          )}
         </div>
       </div>
       {showNewOrder && <NewOrderModal onClose={() => setShowNewOrder(false)} />}

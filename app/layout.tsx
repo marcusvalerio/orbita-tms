@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { Sora, Inter } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { SimulationProvider } from "@/components/simulation/SimulationProvider";
-import { ToastStack } from "@/components/simulation/ToastStack";
-import { TopBar } from "@/components/simulation/TopBar";
 
 // Roobert é uma fonte licenciada (Displaay Type Foundry) e não está disponível
 // via Google Fonts/npm. Usamos Inter como substituto provisório com a mesma
@@ -24,28 +20,13 @@ const roobertStandIn = Inter({
 
 export const metadata: Metadata = {
   title: "ÓRBITA TMS",
-  description: "Sistema de Gestão de Transporte (TMS) — simulação operacional",
+  description: "Sistema de Gestão de Transporte (TMS)",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${sora.variable} ${roobertStandIn.variable} antialiased`}>
-        <SimulationProvider>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <div className="flex-1 min-w-0 h-screen flex flex-col">
-              <TopBar />
-              <main className="flex-1 min-w-0 overflow-hidden flex flex-col">{children}</main>
-            </div>
-          </div>
-          <ToastStack />
-        </SimulationProvider>
-      </body>
+      <body className={`${sora.variable} ${roobertStandIn.variable} antialiased`}>{children}</body>
     </html>
   );
 }
