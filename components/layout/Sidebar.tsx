@@ -33,7 +33,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Planejamento de Transporte", href: "/planning", ready: true },
       { label: "Consolidação de Cargas", href: "/planning#cargas" },
-      { label: "Rotas", href: "/rotas" },
+      { label: "Rotas no mapa", href: "/mapa", ready: true },
       { label: "Transportadoras", href: "/carriers" },
       { label: "Frota", href: "/fleet" },
       { label: "Tabelas de Frete", href: "/rates" },
@@ -106,6 +106,7 @@ export function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         <NavLink href="/" label="Visão Operacional" active={pathname === "/"} isTopLevel ready />
+        <NavLink href="/mapa" label="Mapa Operacional" active={pathname === "/mapa"} isTopLevel ready />
 
         {NAV_GROUPS.map((group) => {
           const isOpen = !!openGroups[group.label];
