@@ -12,10 +12,15 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
 
+  const isApi = pathname.startsWith("/api/");
   if (process.env.ORBITA_AUTH_PROVIDER === "dev") {
     if (request.cookies.has("orbita_dev_session")) return NextResponse.next();
-    return NextResponse.redirect(new URL("/auth/sign-in", request.url));
+    return isApi
+      ? NextResponse.json({ error: "Sessão necessária." }, { status: 401 })
+      : NextResponse.redirect(new URL("/auth/sign-in", request.url));
   }
+  // APIs validam a sessão no próprio handler e respondem 401 (sem redirecionar).
+  if (isApi) return NextResponse.next();
 
   const { getNeonAuth } = await import("./lib/auth/neon");
   return getNeonAuth().middleware({ loginUrl: "/auth/sign-in" })(request);

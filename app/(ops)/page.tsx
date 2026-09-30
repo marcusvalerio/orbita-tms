@@ -129,9 +129,13 @@ export default function OverviewPage() {
                   className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-opal/5 transition-colors"
                 >
                   <div className="min-w-0">
-                    <p className="font-display font-medium text-sm text-cosmic-ink">{shipment.id}</p>
+                    <p className="font-display font-medium text-sm text-cosmic-ink">
+                      {shipment.routeCode ?? shipment.id}
+                      {shipment.routeCode && <span className="font-body font-normal text-cosmic-ink/60"> · {shipment.id}</span>}
+                    </p>
                     <p className="text-xs text-cosmic-ink/55 truncate">
-                      {origin?.city} → {destination?.city} · {carrierName}
+                      {origin?.name} → {destination?.name}
+                      {shipment.stops.length > 2 && ` · ${shipment.stops.length - 1} entregas`} · {carrierName}
                     </p>
                   </div>
                   <StatusBadge status={shipment.status} />

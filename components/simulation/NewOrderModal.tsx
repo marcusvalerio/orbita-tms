@@ -245,6 +245,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                 <div className="col-span-4">
                   <MiniLabel>Produto</MiniLabel>
                   <select
+                    aria-label={`Produto do item ${i + 1}`}
                     value={item.productId ?? ""}
                     onChange={(e) => updateItem(i, { productId: e.target.value || undefined })}
                     className={selectClass}
@@ -261,6 +262,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                   <div className="col-span-3">
                     <MiniLabel>Descrição</MiniLabel>
                     <input
+                      aria-label={`Descrição do item ${i + 1}`}
                       value={item.description ?? ""}
                       onChange={(e) => updateItem(i, { description: e.target.value })}
                       className={selectClass}
@@ -270,6 +272,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                 <div className={item.productId ? "col-span-2" : "col-span-1"}>
                   <MiniLabel>Qtd.</MiniLabel>
                   <input
+                    aria-label={`Quantidade do item ${i + 1}`}
                     type="number"
                     min={1}
                     value={item.quantity}
@@ -280,6 +283,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                 <div className="col-span-2">
                   <MiniLabel>Peso unit. (kg)</MiniLabel>
                   <input
+                    aria-label={`Peso unitário (kg) do item ${i + 1}`}
                     type="number"
                     min={0.1}
                     step={0.1}
@@ -291,6 +295,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
                 <div className="col-span-2">
                   <MiniLabel>Volume (m³)</MiniLabel>
                   <input
+                    aria-label={`Volume (m³) do item ${i + 1}`}
                     type="number"
                     min={0}
                     step={0.1}
@@ -376,7 +381,7 @@ export function NewOrderModal({ onClose }: { onClose: () => void }) {
         </FormSection>
 
         {error && (
-          <p className="text-sm text-cinnamon bg-cinnamon/8 border border-cinnamon/25 rounded-md px-3 py-2 mb-4">{error}</p>
+          <p role="alert" className="text-sm text-cinnamon bg-cinnamon/8 border border-cinnamon/25 rounded-md px-3 py-2 mb-4">{error}</p>
         )}
 
         <div className="flex gap-2 pt-1">

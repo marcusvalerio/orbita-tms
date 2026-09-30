@@ -11,7 +11,9 @@
     "test:integration": "node --import tsx --test \"db/**/*.test.ts\"",
     "db:migrate": "node --import tsx db/migrate.ts",
     "db:seed": "node --import tsx db/seed.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
     "@neondatabase/auth": "^0.5.0-beta",
@@ -22,6 +24,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4",
     "@types/google.maps": "^3.66.4",
     "@types/node": "^20",

@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ÓRBITA TMS
 
-## Getting Started
+Sistema de Gestão de Transporte (TMS): pedidos, planejamento e consolidação, contratação de frete, viagens com rotas multi-parada, ocorrências, entregas, Portal do Parceiro e Mapa Operacional com simulação.
 
-First, run the development server:
+## Modos
+
+| Modo | Para quê | Requisitos |
+|---|---|---|
+| **Demo** (padrão) | explorar o produto; operação no navegador, com cenário de demonstração | nenhum |
+| **Produção** | operação real, multiempresa | Neon PostgreSQL, Neon Auth |
+
+## Começando
 
 ```bash
+npm ci
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra <http://localhost:3000> e use **Carregar Cenário de Demonstração**. Para o mapa real, defina `GOOGLE_MAPS_API_KEY`; sem ela, o Mapa Operacional usa um mapa esquemático.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Script | O que faz |
+|---|---|
+| `npm run check` | lint + tipos + testes unitários |
+| `npm run test:integration` | testes contra PostgreSQL (`TEST_DATABASE_URL`) |
+| `npm run test:e2e` | Playwright (Demo; + Produção com `E2E_DATABASE_URL`) — requer `npm run build` |
+| `npm run db:migrate` / `npm run db:seed` | banco do Modo Produção |
 
-## Learn More
+## Documentação
 
-To learn more about Next.js, take a look at the following resources:
+- [Auditoria ÓRBITA 2.0](docs/orbita-2.0/AUDIT-REPORT.md)
+- [Fase 1 — relatório](docs/orbita-2.0/phase-1/README.md) · [Arquitetura](docs/orbita-2.0/phase-1/ARCHITECTURE.md) · [Banco](docs/orbita-2.0/phase-1/DATABASE.md) · [Auth e RBAC](docs/orbita-2.0/phase-1/AUTH-RBAC.md) · [Google Maps](docs/orbita-2.0/phase-1/GOOGLE-MAPS.md) · [Implantação](docs/orbita-2.0/phase-1/SETUP.md)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Stack: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, PostgreSQL (Neon), Neon Auth, Google Maps Platform.

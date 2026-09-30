@@ -98,6 +98,7 @@ export function PlanningWorkspace({
               <button type="button"
                 key={order.id}
                 onClick={() => isCompatible && toggle(order.id)}
+                aria-pressed={isSelected}
                 disabled={!isCompatible || analyzed}
                 className={`w-full text-left px-5 py-3 transition-colors ${
                   isSelected
