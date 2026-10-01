@@ -35,7 +35,7 @@ export function LoadsWorkspace() {
   const columns: Column<Load>[] = [
     { id: "id", header: "Carga", cell: (l) => <span className="orb-data font-medium">{l.id}</span>, sortValue: (l) => l.id },
     { id: "trecho", header: "Origem → destino", cell: (l) => `${loc(l.originId)?.city} → ${loc(l.destinationId)?.city}` },
-    { id: "pedidos", header: "Pedidos", align: "right", cell: (l) => l.orderIds.length, sortValue: (l) => l.orderIds.length, hideBelow: "md" },
+    { id: "pedidos", header: "Pedidos", align: "right", cell: (l) => l.orderIds.length, sortValue: (l) => l.orderIds.length, hideBelow: "lg" },
     { id: "peso", header: "Peso", align: "right", cell: (l) => `${l.totalWeightKg.toLocaleString("pt-BR")} kg`, mono: true, sortValue: (l) => l.totalWeightKg },
     { id: "volume", header: "Volume", align: "right", cell: (l) => `${l.totalVolumeM3.toLocaleString("pt-BR")} m³`, mono: true, hideBelow: "lg" },
     { id: "situacao", header: "Situação", cell: (l) => <Status entity="load" value={l.status} size="sm" /> },

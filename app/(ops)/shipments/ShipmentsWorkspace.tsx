@@ -64,6 +64,7 @@ export function ShipmentsWorkspace() {
           {t.shipment.id}
         </Link>
       ),
+      hideBelow: "lg",
       sortValue: (t) => t.shipment.id,
     },
     {
