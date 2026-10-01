@@ -47,6 +47,8 @@ export interface OperationalMapProps {
   controlsPosition?: "right" | "left";
 }
 
+let warnedNoKey = false;
+
 export function OperationalMap({
   selectedId,
   onSelect,
@@ -64,6 +66,11 @@ export function OperationalMap({
   const live = useLive();
   const mapConfig = useMapConfig();
   const [provider] = useState<MapProvider>(() => (mapConfig ? new GoogleMapProvider(mapConfig.apiKey, mapConfig.mapId) : new SchematicMapProvider()));
+  useEffect(() => {
+    if (mapConfig || warnedNoKey) return;
+    warnedNoKey = true;
+    console.warn("[ÓRBITA] Sem chave do Maps JavaScript API neste ambiente (GOOGLE_MAPS_BROWSER_KEY) — usando o mapa esquemático. O Google Maps não chega a ser carregado.");
+  }, [mapConfig]);
   const [handle, setHandle] = useState<MapHandle | null>(null);
   const [status, setStatus] = useState<MapStatus>({ kind: "loading" });
   const [follow, setFollow] = useState(false);
@@ -199,7 +206,7 @@ export function OperationalMap({
   };
 
   return (
-    <section aria-label={label} className={cn("relative isolate min-h-0 overflow-hidden bg-[var(--orb-map-land)]", className)}>
+    <section aria-label={label} data-map-provider={status.kind === "ready" ? status.provider : status.kind} className={cn("relative isolate min-h-0 overflow-hidden bg-[var(--orb-map-land)]", className)}>
       <MapCanvas provider={provider} scene={scene} fitKey={fitKey} fitPoints={fitPoints} onMarkerClick={onMarkerClick} onHandle={setHandle} onStatus={setStatus} />
 
       {status.kind === "loading" && (
@@ -243,7 +250,7 @@ export function OperationalMap({
       {(status.kind === "fallback" || (status.kind === "ready" && status.provider === "schematic")) && (
         <Tooltip
           side="top"
-          content={status.kind === "fallback" ? `Mapa esquemático: ${status.reason}` : "Configure GOOGLE_MAPS_API_KEY para o mapa real. Rotas, ETAs e simulação funcionam igual."}
+          content={status.kind === "fallback" ? `Mapa esquemático: ${status.reason}` : "Mapa esquemático: o servidor não recebeu GOOGLE_MAPS_BROWSER_KEY neste ambiente. Rotas, ETAs e simulação funcionam igual."}
         >
           <span tabIndex={0} className="absolute bottom-3 left-3 z-10 hidden rounded-sm border border-line-subtle bg-surface/90 px-2 py-1 text-caption text-fg-muted shadow-1 md:inline">
             Mapa esquemático

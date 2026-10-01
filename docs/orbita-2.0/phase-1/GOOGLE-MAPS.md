@@ -15,11 +15,24 @@ Contratos em `lib/geo/types.ts`. Nenhuma tela importa o SDK do Google. O Google 
 
 | API | Uso no ÓRBITA | Onde é chamada | Chave |
 |---|---|---|---|
-| **Maps JavaScript API** | mapa, marcadores (AdvancedMarker), polylines | navegador | `GOOGLE_MAPS_API_KEY` (navegador) |
-| **Routes API** (`computeRoutes`) | geometria, distância e duração com paradas intermediárias (até 25) | servidor | `GOOGLE_MAPS_SERVER_API_KEY` |
-| **Geocoding API** | busca de endereço no mapa | servidor | `GOOGLE_MAPS_SERVER_API_KEY` |
+| **Maps JavaScript API** | mapa, marcadores (AdvancedMarker), polylines | navegador | `GOOGLE_MAPS_BROWSER_KEY` (navegador) |
+| **Routes API** (`computeRoutes`) | geometria, distância e duração com paradas intermediárias (até 25) | servidor | `GOOGLE_MAPS_SERVER_KEY` |
+| **Geocoding API** | busca de endereço no mapa | servidor | `GOOGLE_MAPS_SERVER_KEY` |
 
 Map ID: crie um em *Google Cloud Console → Google Maps Platform → Map Management* (tipo JavaScript, vetorial) e informe em `GOOGLE_MAPS_MAP_ID`. Sem ele o código usa `DEMO_MAP_ID`, válido só para testes.
+
+## Diagnóstico: "Mapa esquemático" aparecendo
+
+O selo **Mapa esquemático** só aparece quando o fallback está ativo; o tooltip dele e o console (`[ÓRBITA] …`) dizem o motivo. O elemento do mapa expõe `data-map-provider` (`google` · `schematic` · `fallback` · `loading`).
+
+| Sintoma | Causa | Correção |
+|---|---|---|
+| Console: *"Sem chave do Maps JavaScript API neste ambiente"*; nenhuma requisição a `maps.googleapis.com`; HTML com `"mapConfig":null` | o servidor não tem `GOOGLE_MAPS_BROWSER_KEY` **neste ambiente** (nome diferente, ou variável só no escopo Production e não em Preview) | criar a variável com esse nome no escopo certo (Production **e** Preview) e **fazer novo deploy** — variáveis só valem para deploys feitos depois |
+| Console do Google: `RefererNotAllowedMapError` | o domínio atual não está nos HTTP referrers da chave | incluir o domínio (e o padrão dos previews) na restrição |
+| `ApiNotActivatedMapError` | Maps JavaScript API desabilitada no projeto | habilitar a API |
+| `ApiTargetBlockedMapError` | a restrição de API da chave não inclui Maps JavaScript API | adicionar a API na restrição da chave de navegador |
+| `BillingNotEnabledMapError` | projeto sem faturamento | vincular conta de faturamento |
+| `InvalidKeyMapError` | chave errada (ex.: a de servidor no lugar da de navegador) | usar a chave de navegador |
 
 ## Chaves e restrições (obrigatório antes de produção)
 
@@ -27,15 +40,16 @@ Map ID: crie um em *Google Cloud Console → Google Maps Platform → Map Manage
 
 | Chave | Restrição de aplicação | Restrição de API | Variável |
 |---|---|---|---|
-| Navegador | *HTTP referrers*: `https://<seu-domínio>/*`, `https://*.vercel.app/*` só se usar previews, `http://localhost:3000/*` apenas na chave de desenvolvimento | somente Maps JavaScript API | `GOOGLE_MAPS_API_KEY` |
-| Servidor | *IP addresses* quando o provedor tiver IP de saída fixo; na Vercel (IPs dinâmicos) use "Nenhuma" **com** restrição de API e cotas | somente Routes API + Geocoding API | `GOOGLE_MAPS_SERVER_API_KEY` |
+| Navegador | *HTTP referrers*: `https://<seu-domínio>/*`; para previews da Vercel, `https://<projeto>-*-<time>.vercel.app/*` (ou `https://*.vercel.app/*`); `http://localhost:3000/*` apenas na chave de desenvolvimento | somente Maps JavaScript API | `GOOGLE_MAPS_BROWSER_KEY` |
+| Servidor | *IP addresses* quando o provedor tiver IP de saída fixo; na Vercel (IPs dinâmicos) use "Nenhuma" **com** restrição de API e cotas | somente Routes API + Geocoding API | `GOOGLE_MAPS_SERVER_KEY` |
 
 Complementos recomendados:
 - **Cotas diárias** por API no Console (teto de custo) e **alertas de orçamento** no Billing.
 - Chaves distintas para desenvolvimento, homologação e produção.
 - A chave de navegador chega ao navegador por natureza; por isso é entregue **em runtime** pelo servidor (não fica no bundle nem no repositório — verificado: 0 ocorrências em `.next/static` e no Git) e depende da restrição por referrer.
 - A chave de servidor nunca sai do servidor (`/api/geo/*`), que ainda aplica: sessão obrigatória no Modo Produção, limite de 30 req/min por pessoa/IP, validação (2–27 coordenadas dentro do Brasil) e cache (rotas 1 h, endereços 24 h).
-- No Modo Produção, sem `GOOGLE_MAPS_SERVER_API_KEY`, as rotas são **estimadas** (a chave de navegador não é reaproveitada no servidor).
+- Sem `GOOGLE_MAPS_SERVER_KEY`, as rotas são **estimadas** e a busca de endereço usa o cadastro local — em qualquer modo. A chave de navegador **nunca** é reaproveitada no servidor, e a de servidor nunca vai ao navegador.
+- Nomes antigos (`GOOGLE_MAPS_API_KEY`, `GOOGLE_MAPS_SERVER_API_KEY`) ainda são aceitos como alias; o nome novo tem prioridade.
 
 ## Situação da chave de demonstração fornecida (verificada em 30/09/2026)
 

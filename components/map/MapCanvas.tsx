@@ -55,6 +55,8 @@ export function MapCanvas({
 
     const fallBack = (reason: string) => {
       if (disposed) return;
+      // Nunca silencioso: o motivo vai para o console e para o selo "Mapa esquemático".
+      console.warn(`[ÓRBITA] Google Maps indisponível — usando o mapa esquemático. Motivo: ${reason}`);
       created?.destroy();
       el.replaceChildren();
       mount(new SchematicMapProvider());

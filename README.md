@@ -17,7 +17,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Abra <http://localhost:3000> e use **Carregar Cenário de Demonstração**. Para o mapa real, defina `GOOGLE_MAPS_API_KEY`; sem ela, o Mapa Operacional usa um mapa esquemático.
+Abra <http://localhost:3000> e use **Carregar Cenário de Demonstração**. Para o mapa real, defina `GOOGLE_MAPS_BROWSER_KEY` (Maps JavaScript API) e, para rotas e geocodificação do Google, `GOOGLE_MAPS_SERVER_KEY`; sem a chave de navegador, o Mapa Operacional usa um mapa esquemático (ver `docs/orbita-2.0/phase-1/GOOGLE-MAPS.md`).
 
 ## Scripts
 

@@ -1,4 +1,4 @@
-import { getGoogleMapsServerKey, getGoogleMapsBrowserKey } from "@/lib/config/runtime";
+import { getGoogleMapsServerKey } from "@/lib/config/runtime";
 import { GoogleGeocodingProvider } from "@/lib/geo/google/geocoding";
 import { TtlCache } from "@/lib/geo/server/guards";
 import { authorizeGeoRequest } from "@/lib/geo/server/access";
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const cached = cache.get(q.toLowerCase());
   if (cached) return Response.json({ results: cached });
 
-  const apiKey = getGoogleMapsServerKey() ?? (process.env.ORBITA_MODE !== "production" ? getGoogleMapsBrowserKey() : null);
+  const apiKey = getGoogleMapsServerKey(); // nunca a chave de navegador
   if (!apiKey) return Response.json({ error: "Geocodificação não configurada." }, { status: 503 });
   try {
     const results = await new GoogleGeocodingProvider(apiKey).geocode(q);

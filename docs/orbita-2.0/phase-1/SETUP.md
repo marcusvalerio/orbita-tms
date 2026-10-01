@@ -28,9 +28,9 @@ DATABASE_URL=postgres://localhost/orbita_dev npm run db:seed -- --company atlas 
 | `DATABASE_URL_UNPOOLED` | connection string direta (migrations) | Production |
 | `NEON_AUTH_BASE_URL` | `https://ep-twilight-morning-b6pvzgs7.neonauth.c-2.sa-east-1.aws.neon.tech/orbita/auth` | Production |
 | `NEON_AUTH_COOKIE_SECRET` | `openssl rand -base64 32` (novo, só na Vercel) | Production |
-| `GOOGLE_MAPS_API_KEY` | chave de navegador restrita por referrer | Production |
-| `GOOGLE_MAPS_MAP_ID` | Map ID vetorial | Production |
-| `GOOGLE_MAPS_SERVER_API_KEY` | chave de servidor (Routes + Geocoding) | Production |
+| `GOOGLE_MAPS_BROWSER_KEY` | chave de navegador (Maps JavaScript API) restrita por referrer | Production **e Preview** |
+| `GOOGLE_MAPS_MAP_ID` | Map ID vetorial | Production e Preview |
+| `GOOGLE_MAPS_SERVER_KEY` | chave de servidor (Routes + Geocoding) | Production e Preview |
 
 Não definir `ORBITA_AUTH_PROVIDER` (padrão `neon`) nem nenhuma variável `ORBITA_DEV_*` em produção.
 

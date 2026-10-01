@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveBrowserKey, resolveServerKey } from "./google-keys";
 
 // Configuração de execução, lida no servidor em tempo de requisição.
 //
@@ -59,14 +60,20 @@ export function getDevAuthConfig() {
   return { secret, password: required("ORBITA_DEV_AUTH_PASSWORD") };
 }
 
-/** Chave do Maps JavaScript API — exposta ao navegador por natureza; restrinja por referrer. */
+/**
+ * Chave do Maps JavaScript API (GOOGLE_MAPS_BROWSER_KEY; alias legado
+ * GOOGLE_MAPS_API_KEY) — exposta ao navegador por natureza; restrinja por referrer.
+ */
 export function getGoogleMapsBrowserKey(): string | null {
-  return process.env.GOOGLE_MAPS_API_KEY || null;
+  return resolveBrowserKey(process.env)?.value ?? null;
 }
 
-/** Chave server-side (Routes/Geocoding). Nunca enviada ao navegador. */
+/**
+ * Chave server-side para Routes/Geocoding (GOOGLE_MAPS_SERVER_KEY; alias legado
+ * GOOGLE_MAPS_SERVER_API_KEY). Nunca enviada ao navegador.
+ */
 export function getGoogleMapsServerKey(): string | null {
-  return process.env.GOOGLE_MAPS_SERVER_API_KEY || null;
+  return resolveServerKey(process.env)?.value ?? null;
 }
 
 export function getGoogleMapsMapId(): string {

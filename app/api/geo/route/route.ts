@@ -1,4 +1,4 @@
-import { getGoogleMapsServerKey, getGoogleMapsBrowserKey } from "@/lib/config/runtime";
+import { getGoogleMapsServerKey } from "@/lib/config/runtime";
 import { GoogleRoutesProvider, MAX_INTERMEDIATES } from "@/lib/geo/google/routes";
 import { estimateRoute } from "@/lib/geo/estimate";
 import { TtlCache, parseStops } from "@/lib/geo/server/guards";
@@ -11,11 +11,6 @@ import type { RouteResult } from "@/lib/geo/types";
 
 const cache = new TtlCache<RouteResult>(60 * 60 * 1000);
 
-function serverKey(): string | null {
-  // Modo Produção exige GOOGLE_MAPS_SERVER_API_KEY (restrita por API, sem
-  // referrer). No Modo Demo, aceita a chave única de desenvolvimento.
-  return getGoogleMapsServerKey() ?? (process.env.ORBITA_MODE !== "production" ? getGoogleMapsBrowserKey() : null);
-}
 
 export async function POST(request: Request) {
   const access = await authorizeGeoRequest();
@@ -29,7 +24,9 @@ export async function POST(request: Request) {
   const cached = cache.get(key);
   if (cached) return Response.json(cached, { headers: { "x-orbita-cache": "hit" } });
 
-  const apiKey = serverKey();
+  // Só a chave de servidor (GOOGLE_MAPS_SERVER_KEY). A de navegador é restrita
+  // por referrer e nunca é reaproveitada aqui.
+  const apiKey = getGoogleMapsServerKey();
   let result: RouteResult;
   if (apiKey) {
     try {
