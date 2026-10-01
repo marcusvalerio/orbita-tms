@@ -118,3 +118,17 @@ test("horizonte agrupa paradas por hora de ETA (atrasada / em risco / no prazo)"
   const pending = trip.stops.filter((s) => s.index > 0 && s.state !== "done").length;
   assert.equal(h.buckets.reduce((n, b) => n + b.late + b.risk + b.ok, 0), pending);
 });
+
+test("fila de entregas: atrasadas primeiro, entregas registradas com resultado", async () => {
+  const { deliveryQueue } = await import("./deliveries");
+  const d = data();
+  const { shipment, pos } = tripFixture(d, [600, 30, 600], [0, 48, 90]);
+  const trips = new Map([[shipment.id, readTrip(d, shipment, pos)]]);
+  for (const s of d.shipments) trips.set(s.id, readTrip(d, s, null));
+  const rows = deliveryQueue(d, trips);
+  assert.equal(rows[0].state, "atrasada");
+  assert.equal(rows[0].delayMin, 18);
+  assert.ok(rows.some((r) => r.deliveryId && r.result), "entregas do domínio entram com resultado");
+  const keys = rows.map((r) => r.key);
+  assert.equal(new Set(keys).size, keys.length, "sem duplicidade");
+});

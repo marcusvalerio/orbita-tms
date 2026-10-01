@@ -83,6 +83,7 @@ export const STATUS: Record<StatusEntity, Record<string, StatusSpec>> = {
     Late: s("Atrasada", "danger", "risk"),
     AtRisk: s("Em risco", "warning", "risk"),
     Scheduled: s("Programada", "neutral", "idle"),
+    Served: s("Atendida", "success", "done"),
   },
   occurrence: {
     open: s("Em aberto", "exception", "issue"),
