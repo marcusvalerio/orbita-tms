@@ -57,6 +57,60 @@ Mínimo absoluto 12px. Títulos em sentence case; caixa-alta só em siglas.
 - Elevação: `shadow-1` (sticky) · `shadow-2` (drawer, painel sobre mapa) · `shadow-3` (dialog, ⌘K, popover, toast). Sem sombra no workspace.
 - Layout: sidebar 232/56px · header 48px · drawer 440px · bottom nav 60px.
 
+## Inventário
+
+### Primitives — `components/ds`
+
+| Componente | Arquivo | Estados / notas |
+|---|---|---|
+| `Button` | Button.tsx | primary · secondary · ghost · danger · brand-ghost; sm/md/lg; `loading` (aria-busy, mantém foco), `selected` (aria-pressed), `asChild`, `iconOnly` |
+| `IconButton` | Button.tsx | rótulo obrigatório (tooltip + nome acessível), atalho, badge |
+| `Tooltip` · `Popover` · `Menu` | Overlay.tsx | Radix; `Menu` aceita itens e `"separator"`; ⋯ é o lugar das ações além das 2 principais |
+| `Dialog` · `ConfirmDialog` · `Drawer` | Overlay.tsx | foco no conteúdo ao abrir; Drawer lateral (≥768px) ou sheet (mobile), largura por `--orb-drawer-w` |
+| `Field` · `Input` · `Textarea` · `Select` · `DateInput` · `SearchInput` · `Checkbox` | Form.tsx | `Field` liga rótulo, dica e erro (`aria-describedby`, `aria-invalid`) |
+| `Combobox` | Form.tsx | cmdk em Popover |
+| `SegmentedControl` · `Tabs`/`TabPanel` | Form.tsx | Tabs sem painel (visões) não apontam `aria-controls` |
+| `Spinner` · `Skeleton` · `SkeletonRows` · `EmptyState` · `ErrorState` · `LoadingState` · `Toaster` | Feedback.tsx | toast `polite` (sucesso/info) e `assertive` (erro), com ação |
+
+### Componentes — `components/ds`
+
+| Componente | Uso |
+|---|---|
+| `Status` · `StatusDot` · `StatusGlyphIcon` | **ícone + texto + cor** a partir de `lib/ui/status.ts` (uma tabela por entidade); pisca uma vez quando o valor muda |
+| `FilterBar` / `FilterChip` | radiogroup com contagem; estado na URL (`useUrlParam`) — mapa, fila e tabela leem o mesmo filtro |
+| `DataTable` | ordenação, seleção, linha ativa, cabeçalho fixo, paginação, teclado, `rowActions`, densidade, `hideBelow` por coluna, cartão no mobile, linhas novas com `.orb-enter` |
+| `KeyValue` · `MetricGrid` · `Kpi` · `Progress` | dados densos; `KeyValue` dentro de `<dl>` |
+| `TripProgress` · `Timeline` | paradas por estado (concluída, próxima, atrasada, em risco, ocorrência) |
+| `AttentionMeter` | nunca sozinho: sempre ao lado do motivo em texto |
+| `DistributionBar` · `HeatStrip` | micrográficos com equivalente textual (`role=img` + rótulo, tabela sr-only) |
+| `SectionHeader` · `Kbd` · `EntityRow` | estrutura |
+
+### Patterns — `components/patterns`
+
+| Pattern | Telas |
+|---|---|
+| `useTripActions` (ações + diálogos de ocorrência/resolução) | Central, Mapa, Viagem, fila "Agora" |
+| `TripPanel` | drawer da Central, painel do Mapa |
+| `AttentionCard` | fila "Agora" — motivo explícito, até 2 ações, resto no ⋯ |
+| `NewOrderDialog` | header ("Novo"), ⌘K, Pedidos |
+| `TenderPanel` | Cargas (contratação no contexto da carga) |
+| `ResourceActions` · `ResourceTrips` | Frota, Motoristas, Transportadoras |
+
+### Layouts — `components/shell`
+
+`AppShell` (providers, skip link, transição de página) · `Sidebar` 232/56px · `Header` (breadcrumb, ⌘K, notificações, "Novo", perfil) · `BottomNav` (Central · Mapa · Viagens · Ocorrências · Mais) · `CommandMenu` (⌘K ou `/`: nesta tela, recentes, busca de entidades, criar, filtros prontos, ir para).
+
+### Derivações puras — `lib/ui`
+
+`readTrip` (estado de cada parada: ETA × janela, margem de risco 15 min) · `attentionQueue` (**Attention Score determinístico** — soma de regras explícitas, cada item com motivo; não é previsão) · `deliveryQueue` · `horizon` · `TRIP_FILTERS` · `buildSearchIndex`. Testadas em `lib/ui/*.test.ts`.
+
+## Acessibilidade
+
+- Contraste AA medido por teste (`lib/design/contrast.test.ts`) e por axe nas telas (`tests/e2e/a11y.spec.ts`, falha em *serious/critical*).
+- Status nunca só por cor (ícone + texto). Foco visível 2px em tudo; skip link; `aria-live` na fila e nos toasts.
+- Mapa: grupo rotulado; marcadores são botões com nome; o painel lateral repete tudo o que o mapa mostra.
+- Movimento reduzido respeitado (ver Motion).
+
 ## Motion
 
 Ver [MOTION.md](MOTION.md).
