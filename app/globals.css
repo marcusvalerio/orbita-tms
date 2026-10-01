@@ -191,13 +191,6 @@
   --orb-bottom-nav-h: 60px;
   --orb-drawer-w: 440px;
 
-  /* --- Legado (Fase 1) — removido quando todas as telas migrarem --------- */
-  --color-cosmic-ink: #161616;
-  --color-blue-opal: #ff5b19;
-  --color-suez-canal: #aecacd;
-  --color-rowdy-orange: #aecacd;
-  --color-cinnamon: #ff5b19;
-  --color-milk-mustache: #e5e3d2;
 
   color-scheme: light;
 }
@@ -307,13 +300,6 @@
   --color-delivery-subtle: var(--orb-delivery-subtle);
   --color-delivery-line: var(--orb-delivery-line);
 
-  /* legado */
-  --color-cosmic-ink: var(--color-cosmic-ink);
-  --color-blue-opal: var(--color-blue-opal);
-  --color-suez-canal: var(--color-suez-canal);
-  --color-rowdy-orange: var(--color-rowdy-orange);
-  --color-cinnamon: var(--color-cinnamon);
-  --color-milk-mustache: var(--color-milk-mustache);
 
   --shadow-1: var(--orb-shadow-1);
   --shadow-2: var(--orb-shadow-2);
