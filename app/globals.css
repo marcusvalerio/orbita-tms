@@ -485,6 +485,13 @@ body {
 .orb-drawer[data-state="closed"] { animation: orb-drawer-out var(--orb-duration-fast) var(--orb-ease-exit); }
 .orb-sheet[data-state="open"] { animation: orb-sheet-in var(--orb-duration-slow) var(--orb-ease-enter); }
 .orb-sheet[data-state="closed"] { animation: orb-sheet-out var(--orb-duration-base) var(--orb-ease-exit); }
+/* Painel contextual: sheet no mobile, drawer lateral a partir de 768px. */
+.orb-panel[data-state="open"] { animation: orb-sheet-in var(--orb-duration-slow) var(--orb-ease-enter); }
+.orb-panel[data-state="closed"] { animation: orb-sheet-out var(--orb-duration-base) var(--orb-ease-exit); }
+@media (min-width: 768px) {
+  .orb-panel[data-state="open"] { animation: orb-drawer-in var(--orb-duration-base) var(--orb-ease-enter); }
+  .orb-panel[data-state="closed"] { animation: orb-drawer-out var(--orb-duration-fast) var(--orb-ease-exit); }
+}
 .orb-popover[data-state="open"] { animation: orb-pop-in var(--orb-duration-fast) var(--orb-ease-enter); }
 .orb-popover[data-state="closed"] { animation: orb-fade-out var(--orb-duration-instant) var(--orb-ease-exit); }
 .orb-toast[data-state="open"] { animation: orb-toast-in var(--orb-duration-base) var(--orb-ease-enter); }
