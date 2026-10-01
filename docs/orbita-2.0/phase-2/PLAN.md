@@ -1,6 +1,6 @@
 # ÓRBITA 2.0 — Fase 2 · Plano do Órbita Design System 2.0
 
-> Proposta para aprovação. Baseada no [GAP-REPORT](GAP-REPORT.md). Nada foi implementado ainda.
+> Proposta para aprovação. Baseada no [GAP-REPORT](GAP-REPORT.md) e na [análise das referências visuais](REFERENCES.md) (cujos 14 princípios de UI/UX valem junto com a seção 1). Nada foi implementado ainda.
 > Escopo: **camada de experiência**. Domínio, reducer, application layer, repositórios, Neon/Auth/RBAC, Demo × Produção, provedores de mapa/rota/rastreamento, motor de simulação e testes ficam intactos. A UI continua consumindo só `useOperation()` e as portas de `lib/geo`.
 
 ---
@@ -45,7 +45,7 @@ Três camadas em CSS custom properties expostas ao Tailwind v4 via `@theme`: **p
 
 Separação pedida resolvida: **ação = Charcoal**, **crítico = vermelho sólido**, **marca = Tangerine** (que deixa de significar qualquer status). Todo status é **ícone + texto + cor**. Os valores finais são validados por script (WCAG 2.2 AA: texto 4,5:1, texto grande e gráficos 3:1) e o script entra no `npm test`.
 
-Mapa: estilo escuro "control room" (Google Map ID e esquemático com as mesmas cores). O resto da aplicação é claro; o tema escuro completo fica preparado nos tokens, não entregue nesta fase.
+Mapa: estilo **claro e dessaturado** (base Platinum, vias brancas, água azul-acinzentada; Google Map ID e esquemático com as mesmas cores), para que as cores de estado validadas em fundo claro valham também no mapa. O tema escuro ("parede de monitoramento") fica preparado nos tokens, não entregue nesta fase.
 
 ### 2.2 Tipografia
 
@@ -93,6 +93,8 @@ Padrões: entrada = opacidade + 4–8px; overlay 0,98→1; **mudança de status*
 Base: **Radix UI primitives** (Dialog, Popover, DropdownMenu, Tooltip, Tabs, Select, Toast — acessibilidade e foco resolvidos) + **cmdk** (⌘K) + **lucide-react** (ícones). Tudo estilizado com tokens próprios. Sem tema pronto.
 
 Button · IconButton · Input · Select · Combobox · Search · DatePicker (nativo estilizado + máscara pt-BR) · SegmentedControl · Tabs · Badge · **Status** (por entidade: pedido, carga, viagem, parada, entrega, ocorrência) · KPI (valor + meta + tendência + definição) · **DataTable** (ordenação, filtros na URL, seleção, sticky, densidade, teclado, cartões no mobile) · Dropdown · Tooltip · Popover · **Drawer** · Dialog / ConfirmDialog · **CommandMenu** · Toast (`aria-live`, tom, ação) · **Timeline** · Progress (linear + segmentado por paradas) · Skeleton · EmptyState · ErrorState · LoadingState · KeyValue · SectionHeader.
+
+Vindos das referências ([REFERENCES](REFERENCES.md)): FilterChip · StatusDistributionBar · RiskMeter · MapOverlay · MapPeek · HeatStrip · LaneLabel · NavCount · FreshnessIndicator · SegmentedCounter · EntityRow · MetricGrid · TripProgress · ActivityTimeline · MapControls · VehicleLabel · TimeAnchorRow.
 
 Cada um com default / hover / active / focus-visible / disabled / loading / selected / error. Catálogo vivo em **`/design-system`** (rota interna, fora do menu) — alvo do QA visual e da regressão por screenshot.
 
@@ -146,31 +148,37 @@ Decisões:
 
 ## 6. Command Center (`/`)
 
+Mapa como canvas; os dados entram em camadas.
+
 ```
 ┌ Header ─ Command Center ─────────────────────── ⌘K  🔔 2   + Novo  ●Perfil ┐
-├ PULSO ─────────────────────────────────────────────────────────────────────┤
-│ Em rota 3/8 veículos │ Entregas hoje 18/24 │ No prazo 94% ▲ │ Em risco 2 ⚠ │ Ocorrências 1 ⛔ │ Fila de planejamento 8 │
-├──────────────────────────────────────────────┬─────────────────────────────┤
-│                                              │ EXCEÇÕES  (por risco)       │
-│   MAPA (escuro)                               │ ⛔ SP-ZONA-OESTE-017        │
-│   veículos animados, rotas, paradas,          │    Atraso · parada 2 · +34m │
-│   exceções; clique seleciona                  │    [Resolver] [Ver no mapa] │
-│                                              │ ⚠ RJ-ZONA-OESTE-042         │
-│   ▶ ❚❚ ↺  0.5× 1× 2× 5× 10×   simulação 23:10 │    Parada 3 fora da janela  │
-│                                              │    [Contatar] [Replanejar]  │
-├──────────────────────────────────────────────┤ ─────────────────────────── │
-│ VIAGENS EM EXECUÇÃO (tabela compacta)         │ ATIVIDADE (feed ao vivo)    │
-│ Rota · Veículo · Motorista · ▬▬▬▭▭ 3/5 ·       │ 23:08 VIA-00004 saiu do CD  │
-│ Próxima parada · ETA × janela · Atraso · ⋯    │ 23:52 OCC-00003 aberta      │
-└──────────────────────────────────────────────┴─────────────────────────────┘
-          selecionar em qualquer região → drawer da viagem (timeline + ações)
+│┌ FILTROS ───────────────────────────────────────────┐ ┌ AGORA · 3 ───────┐│
+││ 🔍 Viagem, rota, placa │● No prazo 14 │▲ Em risco 2 │ │ 82 ▬▬▬▬ ⛔        ││
+││ ⛔ Exceção 1 │ Fila de planejamento 8 │ ▶ Simulação │ │ SP-ZONA-OESTE-017 ││
+│└────────────────────────────────────────────────────┘ │ CD SP → Santana   ││
+│                                                       │ Atraso aberto há  ││
+│        MAPA (claro, dessaturado)                      │ 34 min; parada 2  ││
+│        veículos com heading, rotas, paradas,          │ prevista 00:52,   ││
+│        exceções; clique → prévia ancorada             │ janela até 00:30  ││
+│              ┌ prévia ─────────────┐                  │ [Resolver][Abrir] ││
+│              │ RJ-ZONA-OESTE-042   │                  │───────────────────││
+│              │ Parada 3 fora da    │                  │ 61 ▬▬▬ ▲ RJ-ZO-042││
+│              │ janela · ETA 01:52  │       [+][−][⌖]  │ 40 ▬▬  ▲ BH-CS-008││
+│              │ [Abrir]             │       [Seguir]   │ Ver todas →       ││
+│              └─────────────────────┘                  └───────────────────┘│
+│┌ PRÓXIMAS 6 H ────────────────────────────────────────────────────────────┐│
+││ 2 janelas em risco │ ░░▓▓█░░░▓░░  00h 01h 02h 03h 04h 05h │ Em execução ⌄││
+│└──────────────────────────────────────────────────────────────────────────┘│
+└ Simulação · atualizado há 1 s ─────────────────────────────────────────────┘
+       prévia → "Abrir" → drawer da viagem (TripProgress, MetricGrid, timeline, ações)
 ```
 
-- **Pulso** em uma faixa (não cartões): cada número é um filtro — clicar filtra mapa, fila e tabela.
-- **Fila de exceções ordenada por risco** (severidade × impacto × tempo aberto), com ações inline permitidas pelo papel.
-- **Tabela de execução** com barra de progresso segmentada por parada e ETA × janela.
-- **Seleção compartilhada** mapa ↔ fila ↔ tabela ↔ drawer.
-- Tablet: mapa em cima, fila e tabela embaixo. Mobile: fila primeiro, mapa e tabela em abas.
+- **Filtros de status com contagem** (FilterChip) filtram mapa, "Agora" e a tabela ao mesmo tempo; estado na URL.
+- **"Agora"**: fila ordenada por **índice de atenção** determinístico (atraso projetado vs janela pelo motor de simulação + severidade da ocorrência aberta + prioridade do pedido), calculado na camada de apresentação, sempre com o motivo em uma frase e no máximo 2 ações (as que o domínio já tem e o papel permite).
+- **"Próximas 6 h"** (HeatStrip): janelas de entrega em risco por hora, derivadas das ETAs simuladas. Expande para a **tabela de execução** (rota, veículo, motorista, TripProgress, próxima parada, ETA × janela, atraso).
+- **Feed de atividade** (ActivityTimeline) no popover de notificações e no drawer.
+- **Seleção compartilhada** mapa ↔ "Agora" ↔ tabela ↔ drawer; cor de seleção = Tangerine.
+- ≥ 1440: painéis flutuam. 1024–1439: acoplam às bordas (mapa ≥ 50% da área). Tablet: mapa em cima, "Agora" e horizonte embaixo. Mobile: "Agora" primeiro, mapa e execução em abas.
 - Estado vazio mantém o fluxo atual ("Novo Pedido" / "Carregar cenário").
 
 ## 7. Mapa e simulação
