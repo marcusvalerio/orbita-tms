@@ -84,6 +84,10 @@
   --orb-chrome-muted: #b7b5ab;
   --orb-chrome-hover: #262624;
   --orb-overlay: rgb(22 22 22 / 0.36);
+  /* Estados sobre o chrome escuro (sidebar, toast, tooltip) */
+  --orb-chrome-danger: #ff8f80;
+  --orb-chrome-success: #7fd6a4;
+  --orb-chrome-warning: #f2b134;
 
   /* Texto */
   --orb-fg: var(--p-graphite-950);
@@ -244,6 +248,9 @@
   --color-chrome-fg: var(--orb-chrome-fg);
   --color-chrome-muted: var(--orb-chrome-muted);
   --color-chrome-hover: var(--orb-chrome-hover);
+  --color-chrome-danger: var(--orb-chrome-danger);
+  --color-chrome-success: var(--orb-chrome-success);
+  --color-chrome-warning: var(--orb-chrome-warning);
   --color-overlay: var(--orb-overlay);
 
   --color-fg: var(--orb-fg);

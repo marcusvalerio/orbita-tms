@@ -43,6 +43,10 @@ const pairs: [fg: string, bg: string, min: number, label: string][] = [
   ["--orb-fg", "--orb-surface-selected", TEXT, "texto / linha selecionada"],
   ["--orb-chrome-fg", "--orb-chrome", TEXT, "navegação / chrome"],
   ["--orb-chrome-muted", "--orb-chrome", TEXT, "navegação secundária / chrome"],
+  ["--orb-chrome-muted", "--orb-chrome-hover", TEXT, "navegação secundária / item em hover"],
+  ["--orb-chrome-danger", "--orb-chrome", TEXT, "atenção / chrome"],
+  ["--orb-chrome-success", "--orb-chrome", TEXT, "sucesso / chrome"],
+  ["--orb-chrome-warning", "--orb-chrome", TEXT, "aviso / chrome"],
   // Ação e marca
   ["--orb-primary-fg", "--orb-primary", TEXT, "botão primário"],
   ["--orb-primary-fg", "--orb-primary-hover", TEXT, "botão primário (hover)"],
