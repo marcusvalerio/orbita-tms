@@ -28,7 +28,7 @@ export default defineConfig({
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } : undefined,
   },
   projects: [
-    { name: "demo", testMatch: /(demo|map)\.spec\.ts/, use: { baseURL: "http://localhost:3100" } },
+    { name: "demo", testMatch: /(demo|map|experience|a11y|visual)\.spec\.ts/, use: { baseURL: "http://localhost:3100" } },
     ...(prodDb ? [{ name: "production", testMatch: /production\.spec\.ts/, use: { baseURL: "http://localhost:3200" } }] : []),
   ],
   webServer: [

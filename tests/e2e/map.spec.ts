@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 test("mapa mostra rotas, paradas e veículo; seleção muda o painel", async ({ page }) => {
   await page.goto("/mapa");
-  await expect(page.getByRole("img", { name: "Mapa esquemático da operação" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Mapa esquemático da operação" })).toBeVisible();
   await expect(page.getByText("Mapa esquemático", { exact: true })).toBeVisible();
 
   const routes = page.getByRole("navigation", { name: "Rotas" });
