@@ -157,8 +157,8 @@ export function TripPanel({
       {actions.length > 0 && (
         <div className="sticky bottom-0 mt-auto flex items-center gap-2 border-t border-line-subtle bg-surface px-4 py-3">
           {[...primary, ...secondary].map((a, i) => (
-            <Button key={a.id} variant={i === 0 && a.primary ? "primary" : "secondary"} icon={<span className="[&_svg]:size-4">{a.icon}</span>} onClick={a.run} className="min-w-0 flex-1">
-              <span className="truncate">{a.label}</span>
+            <Button key={a.id} variant={i === 0 && a.primary ? "primary" : "secondary"} icon={<span className="[&_svg]:size-4">{a.icon}</span>} onClick={a.run} aria-label={a.short ? a.label : undefined} title={a.short ? a.label : undefined} className="min-w-0 flex-1">
+              <span className="truncate">{a.short ?? a.label}</span>
             </Button>
           ))}
           {rest.length > 0 && (

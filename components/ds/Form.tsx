@@ -320,6 +320,8 @@ export function Tabs<T extends string>({
           <RTabs.Trigger
             key={t.value}
             value={t.value}
+            // Sem painéis (abas como navegação de visões): não aponta para conteúdo inexistente.
+            {...(children ? {} : { "aria-controls": undefined })}
             className={cn(
               "relative -mb-px inline-flex h-10 shrink-0 items-center gap-1.5 border-b-2 border-transparent text-body-sm font-medium text-fg-muted",
               "transition-colors duration-(--orb-duration-fast) hover:text-fg data-[state=active]:border-brand data-[state=active]:text-fg"

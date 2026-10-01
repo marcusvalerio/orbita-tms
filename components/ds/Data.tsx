@@ -117,7 +117,7 @@ export function MetricGrid({ items, columns = 2, className }: { items: { label: 
           >
             {m.value ?? "—"}
           </dd>
-          {m.hint && <p className="mt-0.5 truncate text-caption text-fg-subtle">{m.hint}</p>}
+          {m.hint && <dd className="mt-0.5 truncate text-caption text-fg-subtle">{m.hint}</dd>}
         </div>
       ))}
     </dl>
@@ -251,7 +251,7 @@ export interface TimelineItem {
 /** Timeline vertical (paradas de uma viagem, histórico, atividade). */
 export function Timeline({ items, label, className }: { items: TimelineItem[]; label: string; className?: string }) {
   const dot: Record<TimelineItem["state"], string> = {
-    done: "bg-success border-success text-fg-inverse",
+    done: "bg-success-fg border-success-fg text-fg-inverse",
     active: "bg-surface border-info text-info-fg",
     pending: "bg-surface border-line-strong text-fg-muted",
     late: "bg-surface border-danger text-danger-fg",

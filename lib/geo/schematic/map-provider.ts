@@ -12,6 +12,10 @@ const NS = "http://www.w3.org/2000/svg";
 const W = 1000;
 const H = 700;
 const PAD = 90;
+// Faixa superior reservada aos controles flutuantes (filtros, simulação).
+const PAD_TOP = 140;
+// Faixa lateral onde ficam os trilhos de controles (esquerda ou direita, por tela).
+const RAIL_PX = 64;
 const CLUSTER_PX = 30;
 
 /** Y de Web Mercator na MESMA unidade da longitude (graus), para escala uniforme. */
@@ -36,7 +40,8 @@ export class SchematicMapProvider implements MapProvider {
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
-    svg.setAttribute("role", "img");
+    svg.setAttribute("role", "group");
+    svg.setAttribute("aria-roledescription", "mapa");
     svg.setAttribute("aria-label", "Mapa esquemático da operação");
     svg.style.cssText = `width:100%;height:100%;display:block;background:${COLOR.mapLand};touch-action:none;cursor:grab;user-select:none`;
     svg.innerHTML = `<defs><pattern id="orb-grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="${COLOR.mapGrid}" stroke-width="1"/></pattern><pattern id="orb-grid-lg" width="240" height="240" patternUnits="userSpaceOnUse"><path d="M240 0H0V240" fill="none" stroke="${COLOR.mapGrid}" stroke-width="2"/></pattern></defs><rect class="orb-bg" width="${W}" height="${H}" fill="url(#orb-grid)"/><rect width="${W}" height="${H}" fill="url(#orb-grid-lg)" pointer-events="none"/>`;
@@ -94,10 +99,12 @@ export class SchematicMapProvider implements MapProvider {
       return g;
     };
 
-    const captionNode = (m: MapMarker, x: number, y: number) => {
+    const captionNode = (m: MapMarker, x: number, y: number, side: "right" | "left" = "right") => {
       const t = document.createElementNS(NS, "text");
       const r = markerRadius(m);
-      t.setAttribute("x", (x + r + 6).toFixed(1));
+      t.setAttribute("x", (side === "right" ? x + r + 6 : x - r - 6).toFixed(1));
+      if (side === "left") t.setAttribute("text-anchor", "end");
+      t.dataset.side = side;
       t.setAttribute("y", (y + 4).toFixed(1));
       t.setAttribute("font-size", "12");
       t.setAttribute("font-weight", m.kind === "vehicle" ? "600" : "500");
@@ -110,6 +117,54 @@ export class SchematicMapProvider implements MapProvider {
       t.textContent = m.caption ?? "";
       t.dataset.for = m.id;
       return t;
+    };
+
+    // Rótulos sem colisão: veículos primeiro; um rótulo que encostaria em
+    // outro tenta o lado esquerdo e, se ainda colidir, é omitido (o marcador
+    // continua com título acessível). Refeito a cada render e, com veículos
+    // em movimento, no máximo 2×/s.
+    let visibleIds: string[] = [];
+    let lastLayout = 0;
+    const layoutCaptions = () => {
+      lastLayout = performance.now();
+      const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+      const hit = (box: (typeof placed)[number], list: typeof placed) => list.some((o) => box.x0 < o.x1 && box.x1 > o.x0 && box.y0 < o.y1 && box.y1 > o.y0);
+      const byId = new Map(scene.markers.map((m) => [m.id, m]));
+      // Marcadores também são obstáculos para rótulos de lugar (o de veículo,
+      // mais importante, só evita outros rótulos).
+      const markerBoxes: typeof placed = [];
+      // Bordas laterais (trilhos de controles) bloqueiam rótulos, inclusive o do veículo.
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) {
+        const k = Math.min(W / rect.width, H / rect.height);
+        const half = (rect.width * k) / 2;
+        placed.push({ x0: -1e6, x1: W / 2 - half + RAIL_PX * k, y0: -1e6, y1: 1e6 }, { x0: W / 2 + half - RAIL_PX * k, x1: 1e6, y0: -1e6, y1: 1e6 });
+      }
+      for (const id of visibleIds) {
+        const m = byId.get(id);
+        if (!m) continue;
+        const p = project(m.position);
+        const r = markerRadius(m);
+        markerBoxes.push({ x0: p.x - r, x1: p.x + r, y0: p.y - r, y1: p.y + r });
+      }
+      const nodes = visibleIds
+        .map((id) => byId.get(id))
+        .filter((m): m is MapMarker => !!m?.caption)
+        .reverse()
+        .flatMap((m) => {
+          const p = project(m.position);
+          const w = (m.caption ?? "").length * 7.2 + 4;
+          const r = markerRadius(m) + 4;
+          const right = { x0: p.x + r, x1: p.x + r + w, y0: p.y - 9, y1: p.y + 9 };
+          const left = { x0: p.x - r - w, x1: p.x - r, y0: p.y - 9, y1: p.y + 9 };
+          const vehicle = m.kind === "vehicle";
+          const fits = (box: (typeof placed)[number]) => !hit(box, placed) && (vehicle || !hit(box, markerBoxes));
+          const side = fits(right) ? "right" : fits(left) ? "left" : null;
+          if (!side) return [];
+          placed.push(side === "right" ? right : left);
+          return [captionNode(m, p.x, p.y, side)];
+        });
+      captions.replaceChildren(...nodes);
     };
 
     const render = () => {
@@ -156,7 +211,8 @@ export class SchematicMapProvider implements MapProvider {
       const order = (m: MapMarker) => (m.kind === "vehicle" ? (m.selected ? 3 : 2) : m.selected ? 1 : 0);
       const visible = projected.filter((x) => !clustered.has(x.m.id)).sort((a, b) => order(a.m) - order(b.m));
 
-      captions.replaceChildren(...visible.filter((x) => x.m.caption).map((x) => captionNode(x.m, x.p.x, x.p.y)));
+      visibleIds = visible.map((x) => x.m.id);
+      layoutCaptions();
       marks.replaceChildren(
         ...visible.map((x) => markerNode(x.m, x.p)),
         ...clusters.map((c) => {
@@ -256,15 +312,14 @@ export class SchematicMapProvider implements MapProvider {
           node.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
           if (u.headingDeg !== undefined) node.querySelector(".orb-heading")?.setAttribute("transform", `rotate(${Math.round(u.headingDeg)})`);
           const m = scene.markers.find((mm) => mm.id === u.id);
-          if (m?.caption) {
-            const cap = captions.querySelector<SVGTextElement>(`[data-for="${CSS.escape(u.id)}"]`);
-            if (cap) {
-              cap.setAttribute("x", (x + markerRadius(m) + 6).toFixed(1));
-              cap.setAttribute("y", (y + 4).toFixed(1));
-            }
+          const cap = m?.caption ? captions.querySelector<SVGTextElement>(`[data-for="${CSS.escape(u.id)}"]`) : null;
+          if (m && cap) {
+            cap.setAttribute("x", (cap.dataset.side === "left" ? x - markerRadius(m) - 6 : x + markerRadius(m) + 6).toFixed(1));
+            cap.setAttribute("y", (y + 4).toFixed(1));
           }
         }
         if (needsFull) render();
+        else if (performance.now() - lastLayout > 500) layoutCaptions();
       },
       fitBounds(points) {
         if (points.length === 0) return;
@@ -280,8 +335,10 @@ export class SchematicMapProvider implements MapProvider {
         const visW = r.width ? r.width * k : W;
         const visH = r.height ? r.height * k : H;
         const sx = (visW - 2 * PAD) / Math.max(maxX - minX, 0.004);
-        const sy = (visH - 2 * PAD) / Math.max(maxY - minY, 0.004);
-        animateTo({ cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, s: Math.min(sx, sy, 60000) });
+        const sy = (visH - PAD - PAD_TOP) / Math.max(maxY - minY, 0.004);
+        const s = Math.min(sx, sy, 60000);
+        // Centro deslocado para baixo metade da faixa reservada.
+        animateTo({ cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 + (PAD_TOP - PAD) / 2 / s, s });
       },
       panTo(point) {
         animateTo({ ...view, cx: point.lng, cy: mercatorY(point.lat) }, DURATION.slow);

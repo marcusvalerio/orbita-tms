@@ -39,7 +39,7 @@ export function SimulationBar({ resetId, compact, className }: { resetId?: strin
     >
       <span className="flex items-center gap-1.5 px-2 text-caption font-medium text-fg-muted">
         <span aria-hidden className={cn("size-1.5 rounded-full", clock.playing ? "animate-orb-pulse bg-success" : "bg-fg-subtle")} />
-        <span className={compact ? "sr-only" : "sr-only xl:not-sr-only"}>Simulação</span>
+        <span className={compact ? "sr-only" : "sr-only @2xl:not-sr-only"}>Simulação</span>
       </span>
       <button
         type="button"
@@ -49,7 +49,7 @@ export function SimulationBar({ resetId, compact, className }: { resetId?: strin
         className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-primary px-2.5 font-medium text-primary-fg transition-colors hover:bg-primary-hover"
       >
         {clock.playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
-        <span className={compact ? "sr-only" : "hidden sm:inline"}>{clock.playing ? "Pausar" : "Iniciar"}</span>
+        <span className={compact ? "sr-only" : "hidden @md:inline"}>{clock.playing ? "Pausar" : "Iniciar"}</span>
       </button>
       <button
         type="button"
@@ -80,7 +80,7 @@ export function SimulationBar({ resetId, compact, className }: { resetId?: strin
       <span aria-hidden className="mx-0.5 h-5 w-px bg-line-subtle" />
       <span className="flex flex-col px-2 leading-tight" title={`1× = ${BASE_RATE / 60} min de operação por segundo`}>
         <span className="orb-data text-body-sm font-medium text-fg">{time}</span>
-        {!compact && <span className="orb-data hidden text-caption text-fg-subtle 2xl:block">{date}</span>}
+        {!compact && <span className="orb-data hidden text-caption text-fg-subtle @3xl:block">{date}</span>}
       </span>
     </div>
   );

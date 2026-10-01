@@ -331,7 +331,9 @@ export default function DesignSystemPage() {
                 <Kpi label="OTIF" value={94} suffix="%" target="Meta 95%" tone="warning" definition="Entregas no prazo e completas ÷ entregas concluídas" />
                 <Kpi label="Custo por entrega" value={null} />
                 <AttentionMeter score={82} level="alta" />
-                <KeyValue label="Placa" value="RJT3P27" mono />
+                <dl>
+                  <KeyValue label="Placa" value="RJT3P27" mono />
+                </dl>
                 <Kbd>⌘K</Kbd>
               </div>
             </div>

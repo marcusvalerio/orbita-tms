@@ -127,7 +127,7 @@ export function MapWorkspace() {
         className="min-h-[52dvh]"
       >
         <GeoSearch onPick={setPin} />
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex justify-center md:justify-start md:pr-16">
+        <div className="@container pointer-events-none absolute inset-x-3 bottom-3 z-10 flex justify-center md:justify-start md:pr-16">
           <SimulationBar resetId={selectedId} className="pointer-events-auto max-w-full overflow-x-auto" />
         </div>
       </OperationalMap>

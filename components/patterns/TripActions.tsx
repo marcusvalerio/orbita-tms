@@ -17,6 +17,8 @@ export type TripActionId = "start" | "complete" | "report" | "resolve" | "map" |
 export interface TripAction {
   id: TripActionId;
   label: string;
+  /** Rótulo curto para painéis estreitos (o nome acessível continua `label`). */
+  short?: string;
   icon: ReactNode;
   run: () => void;
   /** Ação principal sugerida no estado atual. */
@@ -42,12 +44,12 @@ export function useTripActions(shipment: Shipment | null) {
   const moving = shipment.status === "In Transit" || shipment.status === "At Delivery" || shipment.status === "Pickup Completed";
   const actions: TripAction[] = [];
 
-  if (open && can("occurrences:resolve")) actions.push({ id: "resolve", label: "Resolver ocorrência", icon: <ShieldCheck />, run: () => setDialog("resolve"), primary: true });
+  if (open && can("occurrences:resolve")) actions.push({ id: "resolve", label: "Resolver ocorrência", short: "Resolver", icon: <ShieldCheck />, run: () => setDialog("resolve"), primary: true });
   if (shipment.status === "Planned" && can("shipments:execute"))
     actions.push({ id: "start", label: "Iniciar viagem", icon: <Play />, run: () => void startShipment(shipment.id), primary: true });
   if (moving && !open && can("shipments:execute"))
-    actions.push({ id: "complete", label: "Concluir entrega", icon: <CheckCheck />, run: () => void completeDelivery(shipment.id), primary: actions.length === 0 });
-  if (moving && !open && can("occurrences:report")) actions.push({ id: "report", label: "Registrar ocorrência", icon: <CircleAlert />, run: () => setDialog("report") });
+    actions.push({ id: "complete", label: "Concluir entrega", short: "Concluir", icon: <CheckCheck />, run: () => void completeDelivery(shipment.id), primary: actions.length === 0 });
+  if (moving && !open && can("occurrences:report")) actions.push({ id: "report", label: "Registrar ocorrência", short: "Ocorrência", icon: <CircleAlert />, run: () => setDialog("report") });
   actions.push({ id: "map", label: "Ver no mapa", icon: <MapIcon />, run: () => router.push(`/mapa?viagem=${shipment.id}`) });
   actions.push({ id: "open", label: "Abrir viagem", icon: <ExternalLink />, run: () => router.push(`/shipments/${shipment.id}`) });
 
