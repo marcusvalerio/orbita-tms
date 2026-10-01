@@ -57,11 +57,11 @@ export async function withOperation(audience: "operation" | "partner", children:
 
 function SetupRequired({ message }: { message: string }) {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-milk-mustache px-4">
-      <div className="max-w-md rounded-lg border border-cosmic-ink/15 bg-white px-6 py-5" role="alert">
-        <p className="font-display font-semibold text-cosmic-ink mb-1">Configuração do Modo Produção incompleta</p>
-        <p className="text-sm text-cosmic-ink/75">{message}</p>
-        <p className="text-sm text-cosmic-ink/75 mt-3">Veja docs/orbita-2.0/phase-1/SETUP.md.</p>
+    <main className="flex min-h-dvh items-center justify-center bg-canvas px-4">
+      <div className="max-w-md rounded-lg border border-line-subtle bg-surface p-6 shadow-2" role="alert">
+        <h1 className="font-display text-h1 text-fg">Configuração do Modo Produção incompleta</h1>
+        <p className="mt-1 text-body text-fg-muted">{message}</p>
+        <p className="mt-3 text-body-sm text-fg-muted">Veja docs/orbita-2.0/phase-1/SETUP.md.</p>
       </div>
     </main>
   );

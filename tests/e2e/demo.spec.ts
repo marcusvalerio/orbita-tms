@@ -8,7 +8,7 @@ async function freshDemo(page: Page, withScenario: boolean) {
   await page.getByRole("button", { name: "Reiniciar Simulação" }).last().click();
   if (withScenario) {
     await page.getByRole("button", { name: "Carregar Cenário de Demonstração" }).first().click();
-    await page.getByRole("button", { name: "Carregar Cenário", exact: true }).click();
+    await page.getByRole("button", { name: "Carregar cenário", exact: true }).click();
   }
 }
 

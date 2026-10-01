@@ -35,8 +35,6 @@ export interface NavItem {
   badgeTone?: "attention" | "neutral";
   /** Descrição curta para o Command Menu. */
   keywords?: string;
-  /** Tela ainda não migrada para a 2.0 (some da navegação até existir). */
-  pending?: boolean;
 }
 
 export interface NavGroup {
@@ -75,9 +73,9 @@ export const NAV: NavGroup[] = [
     id: "recursos",
     label: "Recursos",
     items: [
-      { id: "frota", label: "Frota", href: "/fleet", pending: true, icon: Truck, keywords: "veículos placas" },
-      { id: "motoristas", label: "Motoristas", href: "/drivers", pending: true, icon: IdCard, keywords: "condutores cnh" },
-      { id: "transportadoras", label: "Transportadoras", href: "/carriers", pending: true, icon: Building, keywords: "terceiros sla otif" },
+      { id: "frota", label: "Frota", href: "/fleet", icon: Truck, keywords: "veículos placas" },
+      { id: "motoristas", label: "Motoristas", href: "/drivers", icon: IdCard, keywords: "condutores cnh" },
+      { id: "transportadoras", label: "Transportadoras", href: "/carriers", icon: Building, keywords: "terceiros sla otif" },
       { id: "parceiros", label: "Parceiros", href: "/parceiros", icon: Handshake, permission: "partners:manage", keywords: "empresas parceiras portal código" },
     ],
   },

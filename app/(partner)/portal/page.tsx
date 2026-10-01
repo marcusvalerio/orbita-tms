@@ -1,431 +1,313 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArrowRight, Inbox, LogOut, Plus } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import { useOperation } from "@/components/operation/OperationProvider";
+import { OrbitaMark } from "@/components/ui/OrbitaMark";
+import { Button, Dialog, EmptyState, Field, Input, Select, SegmentedControl, Status, Textarea, DateInput } from "@/components/ds";
 import type { CargoCharacteristic, PartnerCompany } from "@/lib/domain/types";
 import type { NewSolicitationInput } from "@/lib/sim/reducer";
+import { cn } from "@/lib/ui/cn";
 
-const selectClass =
-  "w-full rounded-md border border-cosmic-ink/15 bg-white px-3 py-2 text-sm text-cosmic-ink focus:outline-none focus:ring-1 focus:ring-blue-opal";
+// Portal do Parceiro: área separada do TMS (sem menu interno). O parceiro
+// entra com o código de acesso (Modo Demo) ou autenticado (Produção), envia
+// solicitações e acompanha o status.
 
-const CARGO_CHARACTERISTICS: CargoCharacteristic[] = [
-  "Refrigerada",
-  "Congelada",
-  "Temperatura ambiente",
-  "Frágil",
-  "Alto valor",
-  "Perigosa",
-  "Perecível",
-  "Sensível à umidade",
-  "Manuseio especial",
-];
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-function daysFromNowIso(days: number) {
-  return new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-}
+const CHARACTERISTICS: CargoCharacteristic[] = ["Refrigerada", "Congelada", "Temperatura ambiente", "Frágil", "Alto valor", "Perigosa", "Perecível", "Sensível à umidade", "Manuseio especial"];
+const isoDay = (offset = 0) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
 
 export default function PortalDoParceiroPage() {
   const { data, createSolicitation, mode } = useOperation();
-  const [codeInput, setCodeInput] = useState("");
-  const [activePartner, setActivePartner] = useState<PartnerCompany | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [code, setCode] = useState("");
+  const [active, setActive] = useState<PartnerCompany | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleEnter = (e: React.FormEvent) => {
-    e.preventDefault();
-    const partner = data.partnerCompanies.find(
-      (p) => p.accessCode.toLowerCase() === codeInput.trim().toLowerCase()
-    );
-    if (!partner) {
-      setCodeError("Código não encontrado. Confira com a empresa operadora.");
-      return;
-    }
-    if (partner.status !== "Ativa") {
-      setCodeError("Esta empresa está inativa e não pode enviar novas solicitações.");
-      return;
-    }
-    setCodeError(null);
-    setActivePartner(partner);
-  };
-
-  // Produção: a pessoa já está autenticada como parceira; o servidor só envia a própria empresa.
   if (mode === "production") {
     const partner = data.partnerCompanies[0];
-    if (!partner) {
+    if (!partner)
       return (
-        <div className="h-screen flex items-center justify-center bg-milk-mustache px-4 text-sm text-cosmic-ink/70" role="alert">
-          Sua conta não está vinculada a uma empresa parceira ativa. Procure a operadora.
-        </div>
+        <main id="conteudo" className="grid min-h-dvh place-items-center bg-canvas px-4">
+          <p role="alert" className="max-w-sm text-center text-body text-fg-muted">
+            Sua conta não está vinculada a uma empresa parceira ativa. Procure a operadora.
+          </p>
+        </main>
       );
-    }
-    return (
-      <PartnerWorkspace
-        partner={partner}
-        onExit={() => signOut()}
-        showForm={showForm}
-        setShowForm={setShowForm}
-        createSolicitation={createSolicitation}
-        locations={data.locations}
-        solicitations={data.solicitations}
-      />
-    );
+    return <PartnerWorkspace partner={partner} onExit={() => signOut()} createSolicitation={createSolicitation} />;
   }
 
-  if (!activePartner) {
+  if (!active) {
+    const enter = (e: React.FormEvent) => {
+      e.preventDefault();
+      const partner = data.partnerCompanies.find((p) => p.accessCode.toLowerCase() === code.trim().toLowerCase());
+      if (!partner) return setError("Código não encontrado. Confira com a empresa operadora.");
+      if (partner.status !== "Ativa") return setError("Esta empresa está inativa e não pode enviar novas solicitações.");
+      setError(null);
+      setActive(partner);
+    };
     return (
-      <div className="h-screen flex items-center justify-center bg-milk-mustache px-4">
-        <form onSubmit={handleEnter} className="w-full max-w-sm rounded-lg bg-white shadow-xl px-6 py-6">
-          <p className="font-display font-semibold text-lg text-cosmic-ink mb-1">Portal do Parceiro</p>
-          <p className="text-sm text-cosmic-ink/55 mb-4">Informe o código de acesso fornecido pela sua operadora.</p>
-          <input
-            value={codeInput}
-            onChange={(e) => setCodeInput(e.target.value)}
-            placeholder="Ex.: FSC-4821"
-            className={`${selectClass} text-center tabular font-display font-semibold`}
-          />
-          {codeError && <p className="text-sm text-cinnamon mt-2">{codeError}</p>}
-          <button type="submit" className="mt-4 w-full rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors">
+      <main id="conteudo" className="grid min-h-dvh place-items-center bg-canvas px-4">
+        <form onSubmit={enter} className="w-full max-w-sm rounded-lg border border-line-subtle bg-surface p-6 shadow-2">
+          <div className="mb-5 flex items-center gap-2">
+            <OrbitaMark size={18} />
+            <span className="font-display text-[15px] font-semibold text-fg">ÓRBITA</span>
+          </div>
+          <h1 className="font-display text-h1 text-fg">Portal do Parceiro</h1>
+          <p className="mb-4 mt-1 text-body-sm text-fg-muted">Informe o código de acesso fornecido pela sua operadora.</p>
+          <Field label="Código de acesso" error={error}>
+            <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ex.: FSC-4821" autoComplete="off" className="orb-data h-10 text-center text-h2 uppercase" autoFocus />
+          </Field>
+          <Button type="submit" variant="primary" size="lg" className="mt-4 w-full" trailing={<ArrowRight className="size-4" aria-hidden />}>
             Continuar
-          </button>
+          </Button>
         </form>
-      </div>
+      </main>
     );
   }
 
   return (
     <PartnerWorkspace
-      partner={activePartner}
+      partner={active}
       onExit={() => {
-        setActivePartner(null);
-        setCodeInput("");
+        setActive(null);
+        setCode("");
       }}
-      showForm={showForm}
-      setShowForm={setShowForm}
       createSolicitation={createSolicitation}
-      locations={data.locations}
-      solicitations={data.solicitations.filter((s) => s.partnerCompanyId === activePartner.id)}
     />
   );
 }
 
-function PartnerWorkspace({
-  partner,
-  onExit,
-  showForm,
-  setShowForm,
-  createSolicitation,
-  locations,
-  solicitations,
-}: {
-  partner: PartnerCompany;
-  onExit: () => void;
-  showForm: boolean;
-  setShowForm: (v: boolean) => void;
-  createSolicitation: (input: NewSolicitationInput) => Promise<{ ok: boolean }>;
-  locations: ReturnType<typeof useOperation>["data"]["locations"];
-  solicitations: ReturnType<typeof useOperation>["data"]["solicitations"];
-}) {
-  const cds = useMemo(() => locations.filter((l) => l.kind === "CD"), [locations]);
-  const clientLocations = useMemo(() => locations.filter((l) => l.kind === "Cliente"), [locations]);
+function PartnerWorkspace({ partner, onExit, createSolicitation }: { partner: PartnerCompany; onExit: () => void; createSolicitation: (input: NewSolicitationInput) => Promise<{ ok: boolean }> }) {
+  const { data, mode } = useOperation();
+  const [creating, setCreating] = useState(false);
+  const mine = (mode === "production" ? data.solicitations : data.solicitations.filter((s) => s.partnerCompanyId === partner.id)).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const loc = (id: string) => data.locations.find((l) => l.id === id);
 
   return (
-    <div className="min-h-screen bg-milk-mustache">
-      <header className="border-b border-cosmic-ink/10 bg-white/60 px-6 py-4 flex items-center justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45">Portal do Parceiro</p>
-          <p className="font-display font-semibold text-cosmic-ink">{partner.tradeName || partner.legalName}</p>
-        </div>
-        <button type="button" onClick={onExit} className="text-xs font-medium text-cosmic-ink/50 hover:text-cosmic-ink">
-          Sair
-        </button>
-      </header>
-
-      <div className="max-w-3xl mx-auto px-6 py-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="font-display font-semibold text-lg text-cosmic-ink">Minhas Solicitações</h1>
-          <button
-            type="button"
-            onClick={() => setShowForm(!showForm)}
-            className="rounded-md bg-blue-opal text-white text-sm font-medium px-3.5 py-1.5 hover:bg-blue-opal/90 transition-colors"
-          >
-            + Nova solicitação
-          </button>
-        </div>
-
-        {showForm && (
-          <NewSolicitationForm
-            partnerId={partner.id}
-            cds={cds}
-            clientLocations={clientLocations}
-            onSubmit={async (input) => {
-              const outcome = await createSolicitation(input);
-              if (outcome.ok) setShowForm(false);
-            }}
-            onCancel={() => setShowForm(false)}
-          />
-        )}
-
-        {solicitations.length === 0 ? (
-          <p className="text-sm text-cosmic-ink/45 mt-4">Nenhuma solicitação enviada ainda.</p>
-        ) : (
-          <div className="rounded-lg border border-cosmic-ink/10 divide-y divide-cosmic-ink/5 bg-white/60 mt-4">
-            {[...solicitations].reverse().map((s) => {
-              const origin = locations.find((l) => l.id === s.originId);
-              const destination = locations.find((l) => l.id === s.destinationId);
-              return (
-                <div key={s.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-display font-medium text-sm text-cosmic-ink">{s.id}</p>
-                    <StatusTag status={s.status} />
-                  </div>
-                  <p className="text-xs text-cosmic-ink/55 mt-0.5">
-                    {origin?.city} → {destination?.city} · {new Date(s.createdAt).toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-              );
-            })}
+    <div className="min-h-dvh bg-canvas">
+      <header className="sticky top-0 z-10 border-b border-line-subtle bg-surface">
+        <div className="mx-auto flex h-14 max-w-4xl items-center gap-3 px-4">
+          <OrbitaMark size={18} />
+          <div className="min-w-0 flex-1">
+            <p className="text-caption text-fg-muted">Portal do Parceiro</p>
+            <p className="truncate text-h3 text-fg">{partner.tradeName || partner.legalName}</p>
           </div>
-        )}
-      </div>
+          <Button variant="ghost" icon={<LogOut className="size-4" aria-hidden />} onClick={onExit}>
+            Sair
+          </Button>
+        </div>
+      </header>
+      <main id="conteudo" className="mx-auto max-w-4xl px-4 py-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-h1 text-fg">Minhas solicitações</h1>
+            <p className="text-body-sm text-fg-muted">Acompanhe o andamento de cada solicitação enviada à operadora.</p>
+          </div>
+          <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)}>
+            Nova solicitação
+          </Button>
+        </div>
+        <div className="overflow-hidden rounded-lg border border-line-subtle bg-surface">
+          {mine.length === 0 ? (
+            <EmptyState icon={<Inbox />} title="Nenhuma solicitação enviada ainda." description="Envie a primeira — ela chega na caixa de entrada da operadora." />
+          ) : (
+            <ul className="divide-y divide-line-subtle">
+              {mine.map((s) => (
+                <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2">
+                      <span className="orb-data text-body-sm font-medium text-fg">{s.id}</span>
+                      <span className="truncate text-body-sm text-fg">{s.productDescription}</span>
+                    </p>
+                    <p className="text-caption text-fg-muted">
+                      {loc(s.originId)?.city} → {loc(s.destinationId)?.city} · {s.totalWeightKg.toLocaleString("pt-BR")} kg · enviada em <span className="orb-data">{new Date(s.createdAt).toLocaleDateString("pt-BR")}</span>
+                      {s.orderId && (
+                        <>
+                          {" "}
+                          · pedido <span className="orb-data">{s.orderId}</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <Status entity="solicitation" value={s.status} size="sm" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </main>
+      {creating && <NewSolicitationDialog partnerId={partner.id} open={creating} onOpenChange={setCreating} createSolicitation={createSolicitation} />}
     </div>
   );
 }
 
-function StatusTag({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    Solicitada: "bg-rowdy-orange/15 text-rowdy-orange",
-    "Em análise": "bg-blue-opal/10 text-blue-opal",
-    "Convertida em Pedido": "bg-emerald-600/10 text-emerald-700",
-    Recusada: "bg-cinnamon/15 text-cinnamon",
-  };
-  return <span className={`text-xs font-medium rounded-full px-2.5 py-1 ${styles[status] ?? ""}`}>{status}</span>;
-}
+function NewSolicitationDialog({ partnerId, open, onOpenChange, createSolicitation }: { partnerId: string; open: boolean; onOpenChange: (o: boolean) => void; createSolicitation: (input: NewSolicitationInput) => Promise<{ ok: boolean }> }) {
+  const { data } = useOperation();
+  const cds = useMemo(() => data.locations.filter((l) => l.kind === "CD"), [data.locations]);
+  const clients = useMemo(() => data.locations.filter((l) => l.kind === "Cliente"), [data.locations]);
+  const [f, setF] = useState({
+    operationType: "B2C" as "B2B" | "B2C",
+    requestedBy: "",
+    contact: "",
+    originId: cds[0]?.id ?? "",
+    pickupDate: isoDay(),
+    pickupWindowStart: "08:00",
+    pickupWindowEnd: "12:00",
+    destinationId: clients[0]?.id ?? "",
+    deliveryDate: isoDay(2),
+    destinationContactName: "",
+    destinationContactPhone: "",
+    productDescription: "",
+    quantity: 1,
+    totalWeightKg: 1,
+    totalVolumeM3: "",
+    nfeNumber: "",
+    romaneioNumber: "",
+    notes: "",
+  });
+  const [chars, setChars] = useState<CargoCharacteristic[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
 
-function NewSolicitationForm({
-  partnerId,
-  cds,
-  clientLocations,
-  onSubmit,
-  onCancel,
-}: {
-  partnerId: string;
-  cds: ReturnType<typeof useOperation>["data"]["locations"];
-  clientLocations: ReturnType<typeof useOperation>["data"]["locations"];
-  onSubmit: (input: NewSolicitationInput) => void;
-  onCancel: () => void;
-}) {
-  const [operationType, setOperationType] = useState<"B2B" | "B2C">("B2C");
-  const [requestedBy, setRequestedBy] = useState("");
-  const [contact, setContact] = useState("");
-  const [originId, setOriginId] = useState(cds[0]?.id ?? "");
-  const [pickupDate, setPickupDate] = useState(todayIso());
-  const [pickupWindowStart, setPickupWindowStart] = useState("08:00");
-  const [pickupWindowEnd, setPickupWindowEnd] = useState("12:00");
-  const [destinationId, setDestinationId] = useState(clientLocations[0]?.id ?? "");
-  const [deliveryDate, setDeliveryDate] = useState(daysFromNowIso(2));
-  const [destinationContactName, setDestinationContactName] = useState("");
-  const [destinationContactPhone, setDestinationContactPhone] = useState("");
-  const [productDescription, setProductDescription] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [totalWeightKg, setTotalWeightKg] = useState(1);
-  const [totalVolumeM3, setTotalVolumeM3] = useState<number | undefined>(undefined);
-  const [characteristics, setCharacteristics] = useState<CargoCharacteristic[]>([]);
-  const [nfeNumber, setNfeNumber] = useState("");
-  const [romaneioNumber, setRomaneioNumber] = useState("");
-  const [notes, setNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const toggleCharacteristic = (c: CargoCharacteristic) =>
-    setCharacteristics((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!originId || !destinationId) {
-      setError("Selecione origem e destino.");
-      return;
-    }
-    if (quantity <= 0 || totalWeightKg <= 0) {
-      setError("Quantidade e peso precisam ser maiores que zero.");
-      return;
-    }
-    if (new Date(deliveryDate) < new Date(pickupDate)) {
-      setError("A data de entrega não pode ser anterior à coleta.");
-      return;
-    }
-    onSubmit({
+  const submit = async () => {
+    const e: Record<string, string> = {};
+    if (!f.originId || !f.destinationId) e.route = "Selecione origem e destino.";
+    if (!f.productDescription.trim()) e.product = "Descreva a carga.";
+    if (!(f.quantity > 0)) e.quantity = "Maior que zero.";
+    if (!(f.totalWeightKg > 0)) e.weight = "Maior que zero.";
+    if (f.deliveryDate < f.pickupDate) e.date = "A entrega não pode ser antes da retirada.";
+    setErrors(e);
+    if (Object.keys(e).length) return;
+    setBusy(true);
+    const outcome = await createSolicitation({
       partnerCompanyId: partnerId,
-      requestedBy: requestedBy || undefined,
-      contact: contact || undefined,
-      operationType,
-      originId,
-      destinationId,
-      pickupDate: new Date(pickupDate).toISOString(),
-      pickupWindowStart,
-      pickupWindowEnd,
-      deliveryDate: new Date(deliveryDate).toISOString(),
-      destinationContactName: destinationContactName || undefined,
-      destinationContactPhone: destinationContactPhone || undefined,
-      productDescription,
-      quantity,
-      totalWeightKg,
-      totalVolumeM3,
-      cargoCharacteristics: characteristics,
-      nfeNumber: nfeNumber || undefined,
-      romaneioNumber: romaneioNumber || undefined,
-      notes: notes || undefined,
+      requestedBy: f.requestedBy || undefined,
+      contact: f.contact || undefined,
+      operationType: f.operationType,
+      originId: f.originId,
+      destinationId: f.destinationId,
+      pickupDate: new Date(f.pickupDate).toISOString(),
+      pickupWindowStart: f.pickupWindowStart,
+      pickupWindowEnd: f.pickupWindowEnd,
+      deliveryDate: new Date(f.deliveryDate).toISOString(),
+      destinationContactName: f.destinationContactName || undefined,
+      destinationContactPhone: f.destinationContactPhone || undefined,
+      productDescription: f.productDescription,
+      quantity: f.quantity,
+      totalWeightKg: f.totalWeightKg,
+      totalVolumeM3: f.totalVolumeM3 ? Number(f.totalVolumeM3) : undefined,
+      cargoCharacteristics: chars,
+      nfeNumber: f.nfeNumber || undefined,
+      romaneioNumber: f.romaneioNumber || undefined,
+      notes: f.notes || undefined,
     });
+    setBusy(false);
+    if (outcome.ok) onOpenChange(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-cosmic-ink/10 bg-white/60 p-5 space-y-4 mb-4">
-      <div>
-        <p className="text-xs font-medium text-cosmic-ink/50 uppercase tracking-wider mb-2">Tipo de operação</p>
-        <div className="flex gap-2">
-          {(["B2B", "B2C"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setOperationType(t)}
-              className={`rounded-md border text-sm font-medium px-4 py-2 ${
-                operationType === t ? "border-blue-opal bg-blue-opal/10 text-blue-opal" : "border-cosmic-ink/15 text-cosmic-ink/60"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Responsável pela solicitação">
-          <input value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} className={selectClass} />
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      dismissible={false}
+      size="lg"
+      title="Nova solicitação de transporte"
+      description="A operadora analisa e converte em pedido."
+      footer={
+        <>
+          <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="primary" loading={busy} onClick={submit}>
+            Enviar solicitação
+          </Button>
+        </>
+      }
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        className="grid gap-3 sm:grid-cols-2"
+      >
+        <Field label="Tipo de operação">
+          <SegmentedControl label="Tipo de operação" value={f.operationType} onChange={(v) => set("operationType", v)} options={[{ value: "B2B", label: "B2B" }, { value: "B2C", label: "B2C" }]} className="w-full" />
         </Field>
-        <Field label="Contato">
-          <input value={contact} onChange={(e) => setContact(e.target.value)} className={selectClass} />
+        <Field label="Responsável">
+          <Input value={f.requestedBy} onChange={(e) => set("requestedBy", e.target.value)} />
         </Field>
-      </div>
-
-      <Field label="Local de retirada">
-        <select value={originId} onChange={(e) => setOriginId(e.target.value)} className={selectClass}>
-          {cds.length === 0 && <option value="">Nenhum local cadastrado pela operadora</option>}
-          {cds.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name} — {l.city}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Data de retirada">
-          <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} className={selectClass} />
+        <Field label="Local de retirada" error={errors.route}>
+          <Select value={f.originId} onChange={(e) => set("originId", e.target.value)}>
+            {cds.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name} — {l.city}
+              </option>
+            ))}
+          </Select>
         </Field>
-        <Field label="Janela — início">
-          <input type="time" value={pickupWindowStart} onChange={(e) => setPickupWindowStart(e.target.value)} className={selectClass} />
+        <Field label="Destino">
+          <Select value={f.destinationId} onChange={(e) => set("destinationId", e.target.value)}>
+            {clients.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name} — {l.city}
+              </option>
+            ))}
+          </Select>
         </Field>
-        <Field label="Janela — fim">
-          <input type="time" value={pickupWindowEnd} onChange={(e) => setPickupWindowEnd(e.target.value)} className={selectClass} />
+        <Field label="Retirada">
+          <div className="flex gap-1">
+            <DateInput value={f.pickupDate} onChange={(e) => set("pickupDate", e.target.value)} aria-label="Data de retirada" />
+            <DateInput kind="time" value={f.pickupWindowStart} onChange={(e) => set("pickupWindowStart", e.target.value)} aria-label="Início da janela de retirada" />
+            <DateInput kind="time" value={f.pickupWindowEnd} onChange={(e) => set("pickupWindowEnd", e.target.value)} aria-label="Fim da janela de retirada" />
+          </div>
         </Field>
-      </div>
-
-      <Field label="Destino">
-        <select value={destinationId} onChange={(e) => setDestinationId(e.target.value)} className={selectClass}>
-          {clientLocations.length === 0 && <option value="">Nenhum destino cadastrado pela operadora</option>}
-          {clientLocations.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name} — {l.city}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Data prevista">
-          <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className={selectClass} />
+        <Field label="Entrega prevista" error={errors.date}>
+          <DateInput value={f.deliveryDate} onChange={(e) => set("deliveryDate", e.target.value)} />
         </Field>
         <Field label="Contato no destino">
-          <input value={destinationContactName} onChange={(e) => setDestinationContactName(e.target.value)} className={selectClass} />
+          <Input value={f.destinationContactName} onChange={(e) => set("destinationContactName", e.target.value)} />
         </Field>
         <Field label="Telefone">
-          <input value={destinationContactPhone} onChange={(e) => setDestinationContactPhone(e.target.value)} className={selectClass} />
+          <Input type="tel" inputMode="tel" value={f.destinationContactPhone} onChange={(e) => set("destinationContactPhone", e.target.value)} />
         </Field>
-      </div>
-
-      <Field label="Produto / descrição da carga">
-        <input required value={productDescription} onChange={(e) => setProductDescription(e.target.value)} className={selectClass} />
-      </Field>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Quantidade">
-          <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} className={selectClass} />
+        <Field label="Produto / descrição da carga" required error={errors.product} className="sm:col-span-2">
+          <Input value={f.productDescription} onChange={(e) => set("productDescription", e.target.value)} />
         </Field>
-        <Field label="Peso total (kg)">
-          <input type="number" min={0.1} step={0.1} value={totalWeightKg} onChange={(e) => setTotalWeightKg(Number(e.target.value))} className={selectClass} />
-        </Field>
-        <Field label="Volume (m³)">
-          <input
-            type="number"
-            min={0}
-            step={0.1}
-            value={totalVolumeM3 ?? ""}
-            onChange={(e) => setTotalVolumeM3(e.target.value ? Number(e.target.value) : undefined)}
-            className={selectClass}
-            placeholder="Opcional"
-          />
-        </Field>
-      </div>
-
-      <div>
-        <p className="text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-1">Características</p>
-        <div className="flex flex-wrap gap-2">
-          {CARGO_CHARACTERISTICS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => toggleCharacteristic(c)}
-              className={`rounded-full border text-xs font-medium px-3 py-1.5 ${
-                characteristics.includes(c) ? "border-blue-opal bg-blue-opal/10 text-blue-opal" : "border-cosmic-ink/15 text-cosmic-ink/60"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
+        <div className="grid grid-cols-3 gap-2 sm:col-span-2">
+          <Field label="Quantidade" error={errors.quantity}>
+            <Input type="number" min={1} value={f.quantity} onChange={(e) => set("quantity", Number(e.target.value))} className="tabular" />
+          </Field>
+          <Field label="Peso total (kg)" error={errors.weight}>
+            <Input type="number" min={0.1} step={0.1} value={f.totalWeightKg} onChange={(e) => set("totalWeightKg", Number(e.target.value))} className="tabular" />
+          </Field>
+          <Field label="Volume (m³)">
+            <Input type="number" min={0} step={0.1} value={f.totalVolumeM3} onChange={(e) => set("totalVolumeM3", e.target.value)} placeholder="Opcional" className="tabular" />
+          </Field>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Número da NF-e">
-          <input value={nfeNumber} onChange={(e) => setNfeNumber(e.target.value)} className={selectClass} placeholder="Opcional" />
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-1.5 text-label text-fg-muted">Características</legend>
+          <div className="flex flex-wrap gap-1.5">
+            {CHARACTERISTICS.map((c) => {
+              const on = chars.includes(c);
+              return (
+                <button key={c} type="button" aria-pressed={on} onClick={() => setChars((p) => (on ? p.filter((x) => x !== c) : [...p, c]))} className={cn("h-7 rounded-sm border px-2 text-body-sm", on ? "border-fg bg-fg text-fg-inverse" : "border-line text-fg hover:border-line-strong")}>
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+        <Field label="NF-e">
+          <Input value={f.nfeNumber} onChange={(e) => set("nfeNumber", e.target.value)} placeholder="Opcional" className="orb-data" />
         </Field>
-        <Field label="Número do romaneio">
-          <input value={romaneioNumber} onChange={(e) => setRomaneioNumber(e.target.value)} className={selectClass} placeholder="Opcional" />
+        <Field label="Romaneio">
+          <Input value={f.romaneioNumber} onChange={(e) => set("romaneioNumber", e.target.value)} placeholder="Opcional" className="orb-data" />
         </Field>
-      </div>
-
-      <Field label="Observações">
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className={`${selectClass} min-h-16`} />
-      </Field>
-
-      {error && <p className="text-sm text-cinnamon bg-cinnamon/8 border border-cinnamon/25 rounded-md px-3 py-2">{error}</p>}
-
-      <div className="flex gap-2">
-        <button type="button" onClick={onCancel} className="flex-1 rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium py-2.5">
-          Cancelar
-        </button>
-        <button type="submit" className="flex-1 rounded-md bg-blue-opal text-white text-sm font-medium py-2.5 hover:bg-blue-opal/90 transition-colors">
-          Enviar Solicitação
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-[11px] uppercase tracking-wider text-cosmic-ink/45 mb-1">{label}</span>
-      {children}
-    </label>
+        <Field label="Observações" className="sm:col-span-2">
+          <Textarea value={f.notes} onChange={(e) => set("notes", e.target.value)} />
+        </Field>
+        <button type="submit" hidden aria-hidden tabIndex={-1} />
+      </form>
+    </Dialog>
   );
 }

@@ -17,7 +17,7 @@ export function BottomNav() {
   const [more, setMore] = useState(false);
   const primary = MOBILE_PRIMARY.map((id) => ALL_ITEMS.find((i) => i.id === id)!);
   const moreActive = !primary.some((i) => isActive(i, pathname));
-  const moreCount = ALL_ITEMS.filter((i) => !MOBILE_PRIMARY.includes(i.id as never) && !i.pending && i.badgeTone === "attention").reduce((n, i) => n + (i.badge?.(data) ?? 0), 0);
+  const moreCount = ALL_ITEMS.filter((i) => !MOBILE_PRIMARY.includes(i.id as never) && i.badgeTone === "attention").reduce((n, i) => n + (i.badge?.(data) ?? 0), 0);
 
   return (
     <>
@@ -70,7 +70,7 @@ export function BottomNav() {
             </div>
             <D.Description className="sr-only">Navegação completa do ÓRBITA</D.Description>
             {NAV.map((g) => {
-              const items = g.items.filter((i) => !i.pending && (!i.permission || can(i.permission)));
+              const items = g.items.filter((i) => (!i.permission || can(i.permission)));
               if (!items.length) return null;
               return (
                 <div key={g.id} className="px-2 pb-2">

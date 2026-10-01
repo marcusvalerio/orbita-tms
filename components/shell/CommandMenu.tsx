@@ -123,7 +123,7 @@ export function CommandMenu() {
   };
 
   const q = query.trim();
-  const nav = ALL_ITEMS.filter((i) => !i.pending && (!i.permission || can(i.permission)));
+  const nav = ALL_ITEMS.filter((i) => (!i.permission || can(i.permission)));
 
   return (
     <D.Root open={commandOpen} onOpenChange={onOpenChange}>

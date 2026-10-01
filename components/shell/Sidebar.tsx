@@ -35,7 +35,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
       <nav aria-label="Áreas" className="orb-scroll flex-1 overflow-y-auto px-2 py-3">
         {NAV.map((group) => {
-          const items = group.items.filter((i) => !i.pending && (!i.permission || can(i.permission)));
+          const items = group.items.filter((i) => (!i.permission || can(i.permission)));
           if (items.length === 0) return null;
           return (
             <div key={group.id} className="mb-4 last:mb-0">

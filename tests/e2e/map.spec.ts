@@ -6,7 +6,7 @@ import { test, expect } from "@playwright/test";
 test.beforeEach(async ({ page }) => {
   await page.goto("/config/preferencias");
   await page.getByRole("button", { name: "Carregar Cenário de Demonstração" }).first().click();
-  await page.getByRole("button", { name: "Carregar Cenário", exact: true }).click();
+  await page.getByRole("button", { name: "Carregar cenário", exact: true }).click();
 });
 
 test("mapa mostra rotas, paradas e veículo; seleção muda o painel", async ({ page }) => {
