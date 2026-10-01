@@ -26,7 +26,7 @@ test("fluxo ponta a ponta: pedido → planejamento → viagem → ocorrência �
   // Pedido: o domínio recusa item sem produto nem descrição e a tela mostra o motivo (L1).
   await page.getByRole("button", { name: "+ Novo Pedido" }).click();
   await page.getByRole("button", { name: "Criar Pedido" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "produto do catálogo ou de uma descrição" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "produto do catálogo ou de uma descrição" }).first()).toBeVisible();
   await page.getByLabel("Descrição do item 1").fill("Caixas de medicamentos");
   await page.getByLabel("Quantidade do item 1").fill("20");
   await page.getByLabel("Peso unitário (kg) do item 1").fill("12");
@@ -42,20 +42,20 @@ test("fluxo ponta a ponta: pedido → planejamento → viagem → ocorrência �
   await expect(page).toHaveURL(/\/shipments\/VIA-00001$/);
 
   await page.getByRole("button", { name: "Iniciar Viagem" }).click();
-  await expect(page.locator("header").getByText("Em Trânsito")).toBeVisible();
+  await expect(page.getByTestId("trip-status").getByText("Em rota")).toBeVisible();
 
   await page.getByRole("button", { name: "Registrar Ocorrência" }).click();
   await page.getByRole("button", { name: "Atraso" }).click();
-  await expect(page.locator("header").getByText("Em Exceção")).toBeVisible();
+  await expect(page.getByTestId("trip-status").getByText("Com ocorrência")).toBeVisible();
   await expect(page.getByRole("button", { name: "Concluir Entrega" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Nova tentativa" }).click();
   await page.getByRole("button", { name: "Concluir Entrega" }).click();
-  await expect(page.locator("header").getByText("Entregue")).toBeVisible();
+  await expect(page.getByTestId("trip-status").getByText("Entregue")).toBeVisible();
 
   // Persistência local: sobrevive ao recarregar.
   await page.reload();
-  await expect(page.locator("header").getByText("Entregue")).toBeVisible();
+  await expect(page.getByTestId("trip-status").getByText("Entregue")).toBeVisible();
 });
 
 test("cenário demo é coerente: exceção aparece na Central com ocorrência aberta", async ({ page }) => {

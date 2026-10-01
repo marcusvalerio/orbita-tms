@@ -1,22 +1,10 @@
 import { withOperation } from "@/lib/server/operation-context";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { TopBar } from "@/components/simulation/TopBar";
-import { ToastStack } from "@/components/simulation/ToastStack";
+import { getGoogleMapsBrowserKey, getGoogleMapsMapId } from "@/lib/config/runtime";
+import { AppShell } from "@/components/shell/AppShell";
 
 export default async function OperationLayout({ children }: { children: React.ReactNode }) {
-  return withOperation(
-    "operation",
-    <>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 min-w-0 h-screen flex flex-col">
-          <TopBar />
-          <main id="conteudo" className="flex-1 min-w-0 overflow-hidden flex flex-col">
-            {children}
-          </main>
-        </div>
-      </div>
-      <ToastStack />
-    </>
-  );
+  // Lidas no servidor, por requisição: a chave não entra no bundle nem no repositório.
+  const apiKey = getGoogleMapsBrowserKey();
+  const mapConfig = apiKey ? { apiKey, mapId: getGoogleMapsMapId() } : null;
+  return withOperation("operation", <AppShell mapConfig={mapConfig}>{children}</AppShell>);
 }

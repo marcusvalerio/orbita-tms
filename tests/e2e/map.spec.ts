@@ -49,7 +49,7 @@ test("simulação: iniciar a 10×, estados das paradas avançam, reiniciar volta
 test("busca de endereço cai para o cadastro local quando o Geocoding não está disponível", async ({ page }) => {
   await page.goto("/mapa");
   await page.getByLabel("Buscar endereço ou local").fill("Pampulha");
-  await page.getByRole("button", { name: "Buscar" }).click();
+  await page.getByRole("button", { name: "Buscar", exact: true }).click();
   await expect(page.getByRole("button", { name: /Pampulha — Belo Horizonte\/MG/ })).toBeVisible();
 });
 

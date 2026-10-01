@@ -133,7 +133,7 @@ function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: number)
         toast.tone === "error" ? "border-danger" : "border-transparent"
       )}
     >
-      <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", toast.tone === "error" ? "text-[#ff8a80]" : "text-[#7fd6a4]")} />
+      <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", toast.tone === "error" ? "text-chrome-danger" : "text-chrome-success")} />
       <p className="flex-1">{toast.message}</p>
       {toast.action && (
         <button type="button" onClick={toast.action.onClick} className="shrink-0 rounded-sm px-1.5 font-semibold text-chrome-fg underline underline-offset-2 hover:no-underline">

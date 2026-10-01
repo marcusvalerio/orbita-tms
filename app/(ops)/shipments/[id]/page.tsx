@@ -90,7 +90,7 @@ export default function ShipmentDetailPage() {
             {shipment.stops.length > 2 && ` · ${shipment.stops.length - 1} entregas`}
           </span>
         }
-        actions={<StatusBadge status={shipment.status} />}
+        actions={<span data-testid="trip-status"><StatusBadge status={shipment.status} /></span>}
       />
 
       <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 max-w-4xl space-y-8">

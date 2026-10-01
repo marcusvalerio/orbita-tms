@@ -39,7 +39,7 @@ test("operador executa comando: persiste no banco e fica na auditoria", async ({
   await page.getByRole("button", { name: "Concluir Entrega" }).click();
   await expect(page.getByText("Entrega concluída — POD gerado.")).toBeVisible();
   await page.reload();
-  await expect(page.locator("header").getByText("Entregue")).toBeVisible();
+  await expect(page.getByTestId("trip-status").getByText("Entregue")).toBeVisible();
 
   const client = new pg.Client({ connectionString: process.env.E2E_DATABASE_URL });
   await client.connect();

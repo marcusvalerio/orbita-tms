@@ -20,10 +20,13 @@ export interface ServerBridge {
   refresh: () => Promise<OperationDataset | null>;
 }
 
-interface Toast {
+export interface Toast {
   id: number;
   message: string;
-  tone: "success" | "error";
+  tone: "success" | "error" | "info";
+  /** Marcado antes da remoção para a animação de saída. */
+  leaving?: boolean;
+  action?: { label: string; onClick: () => void };
 }
 
 interface OperationContextValue {
@@ -51,6 +54,9 @@ interface OperationContextValue {
   resetSimulation?: () => void;
   loadDemoScenario?: () => void;
   toasts: Toast[];
+  /** Feedback de interface que não passa pelo domínio (ex.: "Código copiado"). */
+  notify: (message: string, tone?: Toast["tone"], action?: Toast["action"]) => void;
+  dismissToast: (id: number) => void;
 }
 
 const OperationContext = createContext<OperationContextValue | null>(null);
@@ -79,12 +85,20 @@ export function OperationProvider({
   const [pendingCount, setPendingCount] = useState(0);
   const lastAction = useRef(0);
 
-  const pushToast = useCallback((message: string, tone: Toast["tone"]) => {
-    if (!message) return;
-    const id = ++toastSeq;
-    setToasts((prev) => [...prev, { id, message, tone }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), tone === "error" ? 7000 : 4000);
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 160);
   }, []);
+
+  const pushToast = useCallback(
+    (message: string, tone: Toast["tone"] = "info", action?: Toast["action"]) => {
+      if (!message) return;
+      const id = ++toastSeq;
+      setToasts((prev) => [...prev.slice(-3), { id, message, tone, action }]);
+      setTimeout(() => dismissToast(id), tone === "error" ? 7000 : 4500);
+    },
+    [dismissToast]
+  );
 
   const execute = useCallback(
     async (action: SimulationAction): Promise<CommandOutcome> => {
@@ -139,7 +153,8 @@ export function OperationProvider({
 
   if (!data) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-milk-mustache text-cosmic-ink/60 text-sm" role="status">
+      <div className="flex h-dvh w-full items-center justify-center gap-2 bg-canvas text-body-sm text-fg-muted" role="status">
+        <span className="size-3 animate-orb-pulse rounded-full bg-brand" aria-hidden />
         Carregando operação…
       </div>
     );
@@ -182,6 +197,8 @@ export function OperationProvider({
             }
           : undefined,
       toasts,
+      notify: pushToast,
+      dismissToast,
   };
   return <OperationContext.Provider value={value}>{children}</OperationContext.Provider>;
 }

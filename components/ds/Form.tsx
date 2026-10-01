@@ -225,7 +225,7 @@ export function Combobox({
       <Command label={label} className="flex max-h-72 flex-col">
         <div className="flex items-center gap-2 border-b border-line-subtle px-2.5">
           <SearchIcon aria-hidden className="size-4 text-fg-subtle" />
-          <Command.Input placeholder="Buscar…" className="h-9 flex-1 bg-transparent text-body outline-none placeholder:text-fg-subtle" />
+          <Command.Input placeholder="Buscar…" className="h-9 flex-1 bg-transparent text-body outline-none placeholder:text-fg-subtle focus-visible:outline-none" />
         </div>
         <Command.List className="orb-scroll overflow-y-auto p-1">
           <Command.Empty className="px-2 py-3 text-body-sm text-fg-muted">{emptyText}</Command.Empty>
