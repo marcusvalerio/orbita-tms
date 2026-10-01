@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 test("mapa mostra rotas, paradas e veículo; seleção muda o painel", async ({ page }) => {
   await page.goto("/mapa");
   await expect(page.getByRole("img", { name: "Mapa esquemático da operação" })).toBeVisible();
-  await expect(page.getByText(/Mapa esquemático — configure GOOGLE_MAPS_API_KEY/)).toBeVisible();
+  await expect(page.getByText("Mapa esquemático", { exact: true })).toBeVisible();
 
   const routes = page.getByRole("navigation", { name: "Rotas" });
   await routes.getByRole("button", { name: /BH-CENTRO-SUL-008/ }).click();
@@ -39,7 +39,7 @@ test("simulação: iniciar a 10×, estados das paradas avançam, reiniciar volta
   await expect(page.getByRole("radio", { name: "10×" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: "Iniciar simulação", exact: true }).click();
   await expect.poll(async () => Number(await progress.getAttribute("aria-valuenow")), { timeout: 20_000 }).toBeGreaterThan(10);
-  await expect(panel).toContainText(/Chegou|Em descarga|Entregue/);
+  await expect(panel).toContainText(/Concluída/);
 
   await page.getByRole("button", { name: "Pausar simulação", exact: true }).click();
   await page.getByRole("button", { name: /Reiniciar simulação/ }).click();

@@ -483,6 +483,16 @@ body {
   to { stroke-dashoffset: 0; }
 }
 
+/* Mapa: anel de pulso em SVG (parada ativa, veículo selecionado). */
+.orb-marker-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orb-pulse 1.8s var(--orb-ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orb-marker-pulse { animation: none; }
+}
+
 /* Overlays Radix: entrada/saída por data-state */
 .orb-overlay[data-state="open"] { animation: orb-fade-in var(--orb-duration-base) var(--orb-ease-enter); }
 .orb-overlay[data-state="closed"] { animation: orb-fade-out var(--orb-duration-fast) var(--orb-ease-exit); }
@@ -534,11 +544,16 @@ body {
   border-radius: var(--radius-sm);
 }
 
-/* View Transitions (navegação entre contextos): crossfade curto do workspace. */
-::view-transition-old(orb-workspace) {
+/* View Transitions (navegação entre contextos): só o workspace troca;
+   sidebar e header ficam parados (sem crossfade da página inteira). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(.orb-page-exit) {
   animation: orb-fade-out var(--orb-duration-fast) var(--orb-ease-exit) both;
 }
-::view-transition-new(orb-workspace) {
+::view-transition-new(.orb-page-enter) {
   animation: orb-rise-in var(--orb-duration-base) var(--orb-ease-enter) both;
 }
 

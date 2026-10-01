@@ -252,3 +252,22 @@ test("mapa esquemático: projeção usa a mesma unidade nos dois eixos (sem acha
   const dy = mercatorY(-22.9) - mercatorY(-23.0);
   assert.ok(dy > 0.1 && dy < 0.12);
 });
+
+test("splitPathAt divide a rota no ponto do veículo", async () => {
+  const { splitPathAt } = await import("./polyline");
+  const path = [
+    { lat: 0, lng: 0 },
+    { lat: 0, lng: 1 },
+    { lat: 0, lng: 2 },
+  ];
+  const { done, remaining } = splitPathAt(path, { lat: 0.01, lng: 1.5 });
+  assert.deepEqual(done, [{ lat: 0, lng: 0 }, { lat: 0, lng: 1 }, { lat: 0, lng: 1.5 }]);
+  assert.deepEqual(remaining, [{ lat: 0, lng: 1.5 }, { lat: 0, lng: 2 }]);
+});
+
+test("lerpAngle gira pelo menor arco (sem volta completa)", async () => {
+  const { lerpAngle } = await import("./polyline");
+  assert.equal(lerpAngle(350, 10, 0.5), 0);
+  assert.equal(lerpAngle(10, 350, 0.5), 0);
+  assert.equal(lerpAngle(90, 180, 1), 180);
+});

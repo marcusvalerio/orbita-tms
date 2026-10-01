@@ -9,8 +9,9 @@ export interface GeoPoint {
 
 // --- Mapa (renderização) ---------------------------------------------------------
 
-export type MarkerKind = "origin" | "stop" | "destination" | "vehicle";
-export type MarkerState = "pending" | "arrived" | "done" | "exception";
+export type MarkerKind = "origin" | "stop" | "destination" | "vehicle" | "exception";
+/** Estado visual do marcador. "active" = próxima parada; "late"/"risk" = ETA × janela. */
+export type MarkerState = "pending" | "active" | "arrived" | "done" | "late" | "risk" | "exception";
 
 export interface MapMarker {
   id: string;
@@ -21,12 +22,16 @@ export interface MapMarker {
   state?: MarkerState;
   selected?: boolean;
   headingDeg?: number; // veículos
+  /** Rótulo curto exibido junto ao marcador (ex.: placa e velocidade, nome da parada). */
+  caption?: string;
+  /** Marcador esmaecido (contexto, fora do filtro atual). */
+  muted?: boolean;
 }
 
 export interface MapPolyline {
   id: string;
   path: GeoPoint[];
-  kind: "route" | "route-muted" | "route-done";
+  kind: "route" | "route-muted" | "route-done" | "route-preview";
 }
 
 /** Cena declarativa: a tela descreve o que mostrar; o provedor desenha. */
@@ -41,6 +46,10 @@ export interface MapHandle {
   moveMarkers(updates: { id: string; position: GeoPoint; headingDeg?: number }[]): void;
   fitBounds(points: GeoPoint[]): void;
   onMarkerClick(listener: (markerId: string) => void): void;
+  /** Centraliza suavemente (seguir veículo). Opcional por provedor. */
+  panTo?(point: GeoPoint): void;
+  /** Aproxima (+1) ou afasta (−1). Opcional por provedor. */
+  zoomBy?(delta: number): void;
   destroy(): void;
 }
 

@@ -65,10 +65,13 @@ export class GoogleMapProvider implements MapProvider {
     const { maps, marker: markerLib } = this.libs;
     const map = new maps.Map(container, {
       mapId: this.mapId,
+      // Base clara; o estilo dessaturado do ÓRBITA vem do Map ID (estilização
+      // na nuvem — ver docs/orbita-2.0/phase-2/google-map-style.json).
+      colorScheme: "LIGHT",
       center: { lat: -22.9, lng: -43.3 },
       zoom: 10,
       disableDefaultUI: true,
-      zoomControl: true,
+      zoomControl: false, // controles próprios do ÓRBITA (MapControls)
       fullscreenControl: false,
       clickableIcons: false,
       gestureHandling: "greedy",
@@ -86,7 +89,7 @@ export class GoogleMapProvider implements MapProvider {
         existing.position = m.position;
         existing.content = content;
         existing.title = m.title;
-        existing.zIndex = m.kind === "vehicle" ? 1000 : m.selected ? 500 : 100;
+        existing.zIndex = m.kind === "vehicle" ? (m.selected ? 1100 : 1000) : m.selected ? 500 : 100;
       } else {
         const adv = new markerLib.AdvancedMarkerElement({
           map,
@@ -114,9 +117,21 @@ export class GoogleMapProvider implements MapProvider {
         });
         scene.markers.forEach(upsertMarker);
         polylines.forEach((p) => p.setMap(null));
-        polylines = scene.polylines.map(
-          (line) => new maps.Polyline({ map, path: line.path, clickable: false, ...POLYLINE_STYLES[line.kind] })
-        );
+        polylines = scene.polylines.flatMap((line) => {
+          const { casing, dashed, ...style } = POLYLINE_STYLES[line.kind];
+          const out: google.maps.Polyline[] = [];
+          if (casing) out.push(new maps.Polyline({ map, path: line.path, clickable: false, strokeColor: "#ffffff", strokeOpacity: 1, strokeWeight: casing, zIndex: style.zIndex - 1 }));
+          out.push(
+            new maps.Polyline({
+              map,
+              path: line.path,
+              clickable: false,
+              ...style,
+              ...(dashed ? { strokeOpacity: 0, icons: [{ icon: { path: "M 0,-1 0,1", strokeOpacity: style.strokeOpacity, strokeColor: style.strokeColor, scale: 3 }, offset: "0", repeat: "12px" }] } : {}),
+            })
+          );
+          return out;
+        });
       },
       moveMarkers(updates) {
         for (const u of updates) {
@@ -125,9 +140,9 @@ export class GoogleMapProvider implements MapProvider {
           if (!mk || !data) continue;
           mk.position = u.position;
           if (u.headingDeg !== undefined && u.headingDeg !== data.headingDeg) {
-            const next = { ...data, position: u.position, headingDeg: u.headingDeg };
-            markerData.set(u.id, next);
-            mk.content = markerElement(next);
+            markerData.set(u.id, { ...data, position: u.position, headingDeg: u.headingDeg });
+            // Gira só a seta, sem recriar o elemento (movimento sem saltos).
+            (mk.content as HTMLElement | null)?.querySelector(".orb-heading")?.setAttribute("transform", `rotate(${Math.round(u.headingDeg)})`);
           }
         }
       },
@@ -139,6 +154,12 @@ export class GoogleMapProvider implements MapProvider {
       },
       onMarkerClick(listener) {
         clickListener = listener;
+      },
+      panTo(point: GeoPoint) {
+        map.panTo(point);
+      },
+      zoomBy(delta: number) {
+        map.setZoom((map.getZoom() ?? 10) + delta);
       },
       destroy() {
         markers.forEach((m) => (m.map = null));

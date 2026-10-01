@@ -1,446 +1,152 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import { MapPinned, Route as RouteIcon, Search, Truck } from "lucide-react";
 import { useOperation } from "@/components/operation/OperationProvider";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { MapCanvas, type MapStatus } from "./MapCanvas";
-import { useRoutePlans, stopPoints, TRACKED_STATUSES } from "./useRoutePlans";
-import { GoogleMapProvider } from "@/lib/geo/google/map-provider";
-import { SchematicMapProvider } from "@/lib/geo/schematic/map-provider";
-import { HttpGeocodingProvider, HttpRouteProvider } from "@/lib/geo/client/http-providers";
+import { useLive } from "@/components/live/LiveOperation";
+import { useUrlParam } from "@/components/live/useUrlState";
+import { useBreadcrumb } from "@/components/shell/ShellContext";
+import { Button, EmptyState, FilterBar, Status, Spinner } from "@/components/ds";
+import { TripPanel } from "@/components/patterns/TripPanel";
+import { OperationalMap } from "./OperationalMap";
+import { SimulationBar } from "./SimulationBar";
+import { HttpGeocodingProvider } from "@/lib/geo/client/http-providers";
 import { CatalogGeocodingProvider } from "@/lib/geo/catalog-geocoding";
-import { DemoTrackingProvider } from "@/lib/geo/simulation/demo-tracking";
-import { SIMULATION_SPEEDS, BASE_RATE, type ClockState } from "@/lib/geo/simulation/clock";
-import type { SimulationState } from "@/lib/geo/simulation/engine";
-import type { GeocodeResult, MapHandle, MapMarker, MapProvider, MapScene, StopProgress } from "@/lib/geo/types";
-import type { Shipment } from "@/lib/domain/types";
-
-const TZ = "America/Sao_Paulo";
-const hhmm = (iso?: string | null) =>
-  iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TZ }) : "—";
-const km = (m: number) => `${(m / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km`;
-const duration = (s: number) => {
-  const h = Math.floor(s / 3600);
-  const m = Math.round((s % 3600) / 60);
-  return h > 0 ? `${h} h ${m.toString().padStart(2, "0")} min` : `${m} min`;
-};
-
-const EMPTY_POSITIONS: SimulationState[] = [];
-
-const STOP_STATE: Record<StopProgress, MapMarker["state"]> = {
-  Pendente: "pending",
-  "Em rota": "pending",
-  Chegou: "arrived",
-  "Em descarga": "arrived",
-  Entregue: "done",
-};
+import { filterTrips, parseTripFilter, tripFilterOptions, type TripFilter } from "@/lib/ui/filters";
+import { hhmm } from "@/lib/ui/trip";
+import type { GeocodeResult } from "@/lib/geo/types";
+import { cn } from "@/lib/ui/cn";
 
 /**
- * Assina uma fonte que muda a cada quadro, mas notifica o React no máximo a
- * cada `intervalMs` — sempre com uma notificação final (trailing), para que
- * o último estado (ex.: após pausar/reiniciar) nunca fique para trás.
+ * Mapa: lista de rotas → mapa → painel da rota (padrão lista ↔ mapa ↔ detalhe).
+ * Seleção e filtro na URL; mapa, lista e painel compartilham a mesma seleção.
  */
-function useThrottledStore<T>(subscribe: (cb: () => void) => () => void, get: () => T, intervalMs: number, serverValue: T): T {
-  const throttledSubscribe = useMemo(
-    () => (cb: () => void) => {
-      let last = 0;
-      let timer: ReturnType<typeof setTimeout> | null = null;
-      const unsubscribe = subscribe(() => {
-        const wait = intervalMs - (Date.now() - last);
-        if (wait <= 0) {
-          last = Date.now();
-          cb();
-        } else if (!timer) {
-          timer = setTimeout(() => {
-            timer = null;
-            last = Date.now();
-            cb();
-          }, wait);
-        }
-      });
-      return () => {
-        if (timer) clearTimeout(timer);
-        unsubscribe();
-      };
-    },
-    [subscribe, intervalMs]
-  );
-  return useSyncExternalStore(throttledSubscribe, get, () => serverValue);
-}
-
-export function MapWorkspace({ mapConfig }: { mapConfig: { apiKey: string; mapId: string } | null }) {
+export function MapWorkspace() {
   const { data } = useOperation();
-  const searchParams = useSearchParams();
+  const live = useLive();
+  const [viagem, setViagem] = useUrlParam("viagem");
+  const [filtroRaw, setFiltro] = useUrlParam("filtro");
+  const filtro = parseTripFilter(filtroRaw);
+  const [stop, setStop] = useState<{ id: string; index: number } | null>(null);
+  const [pin, setPin] = useState<GeocodeResult | null>(null);
 
-  const shipments = useMemo(
-    () => data.shipments.filter((s) => s.status !== "Delivered" && s.status !== "Closed" && s.stops.length >= 2),
-    [data.shipments]
-  );
-  const requested = searchParams.get("viagem");
-  const defaultId =
-    (requested && shipments.some((s) => s.id === requested) && requested) ||
-    shipments.find((s) => TRACKED_STATUSES.includes(s.status))?.id ||
-    shipments[0]?.id ||
-    null;
-  const [chosenId, setChosenId] = useState<string | null>(null);
-  const selectedId = chosenId && shipments.some((s) => s.id === chosenId) ? chosenId : defaultId;
-  const selected = shipments.find((s) => s.id === selectedId) ?? null;
+  const trips = useMemo(() => live.shipments.map((s) => live.trips.get(s.id)!).filter(Boolean), [live.shipments, live.trips]);
+  const visible = useMemo(() => filterTrips(trips, filtro), [trips, filtro]);
+  const focusIds = useMemo(() => (filtro === "todas" ? null : new Set(visible.map((t) => t.shipment.id))), [filtro, visible]);
 
-  // Provedores (trocáveis sem tocar nesta tela).
-  const [mapProvider] = useState<MapProvider>(() =>
-    mapConfig ? new GoogleMapProvider(mapConfig.apiKey, mapConfig.mapId) : new SchematicMapProvider()
-  );
-  const [routeProvider] = useState(() => new HttpRouteProvider());
-  const geocoder = useMemo(() => new HttpGeocodingProvider(new CatalogGeocodingProvider(data.locations)), [data.locations]);
-  const [tracking] = useState(() => new DemoTrackingProvider(Date.now()));
-  const [mapStatus, setMapStatus] = useState<MapStatus>({ kind: "loading" });
-  const [handle, setHandle] = useState<MapHandle | null>(null);
-  const [searchPin, setSearchPin] = useState<GeocodeResult | null>(null);
+  const ids = live.shipments.map((s) => s.id);
+  const defaultId = visible.find((t) => t.tracked)?.shipment.id ?? visible[0]?.shipment.id ?? live.shipments[0]?.id ?? null;
+  const selectedId = viagem && ids.includes(viagem) ? viagem : defaultId;
+  const selected = live.shipments.find((s) => s.id === selectedId) ?? null;
+  useBreadcrumb(selected?.routeCode ?? selected?.id ?? null);
 
-  const { results, plans, loadingIds } = useRoutePlans(data, shipments, selectedId, routeProvider);
-  const trackedIds = useMemo(() => shipments.filter((s) => TRACKED_STATUSES.includes(s.status)).map((s) => s.id), [shipments]);
-
-  useEffect(() => {
-    tracking.setPlans(trackedIds.map((id) => plans[id]).filter(Boolean));
-  }, [tracking, plans, trackedIds]);
-  useEffect(() => () => tracking.dispose(), [tracking]);
-
-  // Animação: veículos se movem direto no mapa, fora do ciclo do React.
-  useEffect(() => {
-    if (!handle) return;
-    return tracking.subscribe((positions) =>
-      handle.moveMarkers(positions.map((p) => ({ id: `veh:${p.shipmentId}`, position: p.position, headingDeg: p.headingDeg })))
-    );
-  }, [handle, tracking]);
-
-  // Painel: 4 atualizações por segundo bastam para leitura humana.
-  const subscribeTracking = useCallback((cb: () => void) => tracking.subscribe(cb), [tracking]);
-  const getPositions = useCallback(() => tracking.getSnapshot(), [tracking]);
-  const positions = useThrottledStore<SimulationState[]>(subscribeTracking, getPositions, 250, EMPTY_POSITIONS);
-  const clock = useSyncExternalStore<ClockState | null>(
-    (cb) => tracking.clock.subscribe(cb),
-    () => tracking.clock.getState(),
-    () => null
-  );
-  const selectedPos = positions.find((p) => p.shipmentId === selectedId) ?? null;
-
-  const scene = useMemo<MapScene>(() => {
-    const markers: MapMarker[] = [];
-    const polylines: MapScene["polylines"] = [];
-    for (const s of shipments) {
-      const plan = plans[s.id];
-      if (!plan) continue;
-      polylines.push({ id: `route:${s.id}`, path: plan.path, kind: s.id === selectedId ? "route" : "route-muted" });
-    }
-    if (selected) {
-      const points = stopPoints(data, selected);
-      const pos = positions.find((p) => p.shipmentId === selected.id);
-      selected.stops.forEach((stop, i) => {
-        const loc = data.locations.find((l) => l.id === stop.locationId);
-        const progress = pos?.stopProgress[i] ?? (stop.actualTime ? "Entregue" : "Pendente");
-        markers.push({
-          id: `stop:${selected.id}:${i}`,
-          position: points[i],
-          kind: i === 0 ? "origin" : "stop",
-          label: String(i),
-          title: `${i === 0 ? "Origem" : `Parada ${i}`} — ${loc?.name ?? stop.locationId} (${progress})`,
-          state: selected.status === "Exception" && progress === "Em rota" ? "exception" : STOP_STATE[progress],
-          selected: pos?.activeStopIndex === i,
-        });
-      });
-    }
-    for (const id of trackedIds) {
-      const p = tracking.getSnapshot().find((x) => x.shipmentId === id);
-      const s = shipments.find((x) => x.id === id);
-      if (!p || !s) continue;
-      markers.push({
-        id: `veh:${id}`,
-        position: p.position,
-        kind: "vehicle",
-        title: `Veículo ${s.vehicleId ?? "da transportadora"} — ${s.routeCode ?? s.id}`,
-        headingDeg: p.headingDeg,
-        selected: id === selectedId,
-      });
-    }
-    if (searchPin) {
-      markers.push({ id: "search", position: searchPin.position, kind: "destination", label: "★", title: searchPin.label, state: "arrived" });
-    }
-    return { markers, polylines };
-    // `positions` entra só pelo estado das paradas (throttled); veículos andam via moveMarkers.
-  }, [shipments, plans, selected, selectedId, data, positions, trackedIds, tracking, searchPin]);
-
-  const fitPoints = useMemo(() => {
-    if (searchPin) return [searchPin.position];
-    if (selected && plans[selected.id]) return plans[selected.id].path;
-    return shipments.flatMap((s) => stopPoints(data, s));
-  }, [selected, plans, shipments, data, searchPin]);
-
-  const onMarkerClick = (id: string) => {
-    const [kind, shipmentId] = id.split(":");
-    if ((kind === "veh" || kind === "stop") && shipmentId) {
-      setSearchPin(null);
-      setChosenId(shipmentId);
-    }
+  const select = (id: string | null) => {
+    setPin(null);
+    setStop(null);
+    live.prioritize(id);
+    setViagem(id);
   };
 
-  if (shipments.length === 0) {
+  if (live.shipments.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="max-w-md text-center">
-          <p className="font-display font-semibold text-cosmic-ink mb-1">Nenhuma rota em planejamento ou execução.</p>
-          <p className="text-sm text-cosmic-ink/70 mb-4">
-            As rotas aparecem aqui quando uma carga é contratada. Comece pelo planejamento.
-          </p>
-          <Link href="/planning" className="inline-block rounded-md bg-cosmic-ink text-milk-mustache text-sm font-medium px-4 py-2">
-            Ir para o planejamento
-          </Link>
-        </div>
+      <div className="grid flex-1 place-items-center">
+        <EmptyState
+          icon={<RouteIcon />}
+          title="Nenhuma rota em planejamento ou execução."
+          description="As rotas aparecem aqui quando uma carga é contratada. Comece pelo planejamento."
+          action={
+            <Button variant="primary" asChild>
+              <Link href="/planning">Ir para o planejamento</Link>
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[300px_1fr_360px]">
-      <RouteList shipments={shipments} selectedId={selectedId} onSelect={(id) => { setSearchPin(null); setChosenId(id); }} loadingIds={loadingIds} />
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(52dvh,1fr)_auto] overflow-y-auto lg:grid-cols-[320px_minmax(0,1fr)_380px] lg:grid-rows-1 lg:overflow-hidden">
+      {/* Lista de rotas */}
+      <div className="flex min-h-0 flex-col border-b border-line-subtle bg-surface lg:border-b-0 lg:border-r">
+        <div className="border-b border-line-subtle px-3 py-2.5">
+          <FilterBar label="Filtrar rotas" value={filtro} onChange={(v: TripFilter) => setFiltro(v === "todas" ? null : v)} options={tripFilterOptions(trips).filter((o) => o.count > 0 || o.value === "todas")} />
+        </div>
+        <nav aria-label="Rotas" className="orb-scroll flex gap-2 overflow-x-auto px-3 py-2 lg:block lg:flex-1 lg:space-y-px lg:overflow-y-auto lg:p-0">
+          {visible.length === 0 && <p className="px-4 py-6 text-body-sm text-fg-muted">Nenhuma rota neste filtro.</p>}
+          {visible.map((t) => {
+            const s = t.shipment;
+            const v = data.vehicles.find((x) => x.id === s.vehicleId);
+            const carrier = data.carriers.find((c) => c.id === s.carrierId);
+            const active = s.id === selectedId;
+            const next = t.stops.find((st) => st.state !== "done" && st.index > 0);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => select(s.id)}
+                className={cn(
+                  "orb-focus-inset relative shrink-0 rounded-md border px-3 py-2.5 text-left transition-colors duration-(--orb-duration-instant) lg:block lg:w-full lg:rounded-none lg:border-0 lg:border-b lg:border-line-subtle lg:px-4",
+                  active ? "border-brand bg-surface-selected" : "border-line bg-surface hover:bg-surface-hover"
+                )}
+              >
+                {active && <span aria-hidden className="absolute inset-y-0 left-0 hidden w-0.5 bg-brand lg:block" />}
+                <span className="flex items-center justify-between gap-2">
+                  <span className="orb-data text-body-sm font-medium text-fg">{s.routeCode ?? s.id}</span>
+                  <Status entity="shipment" value={s.status} size="sm" />
+                </span>
+                <span className="mt-0.5 hidden items-center gap-1.5 text-caption text-fg-muted lg:flex">
+                  <Truck className="size-3 shrink-0" aria-hidden />
+                  <span className="orb-data">{v ? v.plate : carrier?.name ?? "—"}</span>
+                  <span>·</span>
+                  <span className="truncate">
+                    {t.doneStops}/{t.stops.length} paradas{next ? ` · próx. ${next.name}` : ""}
+                  </span>
+                  {live.loadingIds.includes(s.id) && <Spinner size={11} label="calculando rota" />}
+                </span>
+                {t.maxDelayMin > 0 ? (
+                  <span className="mt-1 hidden text-caption font-medium text-danger-fg lg:block">Atraso projetado +{t.maxDelayMin} min</span>
+                ) : t.health === "risk" ? (
+                  <span className="mt-1 hidden text-caption font-medium text-warning-fg lg:block">Janela apertada · ETA {hhmm(next?.eta)}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
 
-      <section className="relative min-h-[360px] bg-[#1b1b1b]" aria-label="Mapa operacional">
-        <MapCanvas
-          provider={mapProvider}
-          scene={scene}
-          fitKey={`${selectedId}:${Boolean(plans[selectedId ?? ""])}:${results[selectedId ?? ""]?.source ?? ""}:${searchPin?.label ?? ""}`}
-          fitPoints={fitPoints}
-          onMarkerClick={onMarkerClick}
-          onHandle={setHandle}
-          onStatus={setMapStatus}
-        />
-        <GeoSearch geocoder={geocoder} onPick={setSearchPin} />
-        {mapStatus.kind === "loading" && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-white/80" role="status">
-            Carregando mapa…
-          </div>
-        )}
-        {mapStatus.kind === "fallback" && (
-          <p className="absolute top-16 left-3 right-3 sm:right-auto sm:max-w-sm rounded-md bg-black/80 px-3 py-2 text-xs text-white" role="status">
-            Mapa esquemático: {mapStatus.reason}
-          </p>
-        )}
-        {mapStatus.kind === "ready" && mapStatus.provider === "schematic" && (
-          <p className="absolute top-16 left-3 rounded-md bg-black/80 px-3 py-2 text-xs text-white">
-            Mapa esquemático — configure GOOGLE_MAPS_API_KEY para o mapa real.
-          </p>
-        )}
-        {clock && <SimulationControls clock={clock} tracking={tracking} selectedId={selectedId} hasTracked={trackedIds.length > 0} />}
-      </section>
+      {/* Mapa */}
+      <OperationalMap
+        selectedId={selectedId}
+        onSelect={select}
+        selectedStop={stop && stop.id === selectedId ? stop.index : null}
+        onStopSelect={(id, index) => setStop({ id, index })}
+        focusIds={focusIds}
+        pin={pin}
+        className="min-h-[52dvh]"
+      >
+        <GeoSearch onPick={setPin} />
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex justify-center md:justify-start md:pr-16">
+          <SimulationBar resetId={selectedId} className="pointer-events-auto max-w-full overflow-x-auto" />
+        </div>
+      </OperationalMap>
 
+      {/* Painel da rota */}
       {selected && (
-        <RoutePanel
-          shipment={selected}
-          position={selectedPos}
-          route={results[selected.id]}
-          loading={loadingIds.includes(selected.id)}
-        />
+        <aside aria-label={`Detalhes da rota ${selected.routeCode ?? selected.id}`} className="orb-scroll min-h-0 overflow-y-auto border-t border-line-subtle bg-surface lg:border-l lg:border-t-0">
+          <div key={selected.id} className="animate-orb-rise-in">
+            <TripPanel shipmentId={selected.id} selectedStop={stop?.id === selected.id ? stop.index : null} onStopSelect={(i) => setStop({ id: selected.id, index: i })} />
+          </div>
+        </aside>
       )}
     </div>
   );
 }
 
-function RouteList({
-  shipments,
-  selectedId,
-  onSelect,
-  loadingIds,
-}: {
-  shipments: Shipment[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  loadingIds: string[];
-}) {
+function GeoSearch({ onPick }: { onPick: (r: GeocodeResult) => void }) {
   const { data } = useOperation();
-  return (
-    <nav aria-label="Rotas" className="border-b lg:border-b-0 lg:border-r border-cosmic-ink/10 overflow-y-auto max-h-56 lg:max-h-none">
-      <p className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-cosmic-ink/70 border-b border-cosmic-ink/10">
-        Rotas · {shipments.length}
-      </p>
-      <ul>
-        {shipments.map((s) => {
-          const vehicle = data.vehicles.find((v) => v.id === s.vehicleId);
-          const carrier = data.carriers.find((c) => c.id === s.carrierId);
-          const active = s.id === selectedId;
-          return (
-            <li key={s.id}>
-              <button
-                type="button"
-                aria-pressed={active}
-                onClick={() => onSelect(s.id)}
-                className={`w-full text-left px-4 py-3 border-b border-cosmic-ink/5 transition-colors ${active ? "bg-cosmic-ink text-milk-mustache" : "hover:bg-cosmic-ink/5"}`}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-display font-medium text-sm">{s.routeCode ?? s.id}</span>
-                  <StatusBadge status={s.status} />
-                </span>
-                <span className={`block text-xs mt-0.5 ${active ? "text-milk-mustache/80" : "text-cosmic-ink/70"}`}>
-                  {s.id} · {s.stops.length - 1} {s.stops.length - 1 === 1 ? "entrega" : "entregas"} ·{" "}
-                  {vehicle ? `${vehicle.id} (${vehicle.plate})` : carrier?.name ?? "—"}
-                  {loadingIds.includes(s.id) && " · calculando…"}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
-}
-
-function RoutePanel({
-  shipment,
-  position,
-  route,
-  loading,
-}: {
-  shipment: Shipment;
-  position: SimulationState | null;
-  route?: { distanceMeters: number; durationSeconds: number; source: "google-routes" | "estimate" };
-  loading: boolean;
-}) {
-  const { data } = useOperation();
-  const vehicle = data.vehicles.find((v) => v.id === shipment.vehicleId);
-  const driver = data.drivers.find((d) => d.id === shipment.driverId);
-  const carrier = data.carriers.find((c) => c.id === shipment.carrierId);
-  const tracked = TRACKED_STATUSES.includes(shipment.status);
-
-  return (
-    <aside aria-label={`Detalhes da rota ${shipment.routeCode ?? shipment.id}`} className="border-t lg:border-t-0 lg:border-l border-cosmic-ink/10 overflow-y-auto">
-      <div className="px-5 py-4 border-b border-cosmic-ink/10">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-display font-semibold text-lg text-cosmic-ink">{shipment.routeCode ?? shipment.id}</h2>
-          <StatusBadge status={shipment.status} />
-        </div>
-        <p className="text-xs text-cosmic-ink/70 mt-0.5">
-          <Link href={`/shipments/${shipment.id}`} className="underline underline-offset-2">{shipment.id}</Link>
-          {" · saída "}{hhmm(shipment.departureTime)}
-        </p>
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div><dt className="text-xs text-cosmic-ink/60">Veículo</dt><dd className="text-cosmic-ink">{vehicle ? `${vehicle.id} · ${vehicle.plate}` : "Da transportadora"}</dd></div>
-          <div><dt className="text-xs text-cosmic-ink/60">Motorista</dt><dd className="text-cosmic-ink">{driver?.name ?? "—"}</dd></div>
-          <div><dt className="text-xs text-cosmic-ink/60">Transportadora</dt><dd className="text-cosmic-ink">{carrier?.name ?? "Frota Própria"}</dd></div>
-          <div>
-            <dt className="text-xs text-cosmic-ink/60">Distância · Duração</dt>
-            <dd className="text-cosmic-ink tabular">
-              {route ? `${km(route.distanceMeters)} · ${duration(route.durationSeconds)}` : loading ? "Calculando…" : "—"}
-            </dd>
-          </div>
-        </dl>
-        {route && (
-          <p className="mt-2 text-xs text-cosmic-ink/60">
-            {route.source === "google-routes" ? "Rota calculada pelo Google Routes." : "Estimativa local (linha reta × fator de via) — provedor de rotas indisponível."}
-          </p>
-        )}
-        {tracked && position && (
-          <div className="mt-3">
-            <div className="flex justify-between text-xs text-cosmic-ink/70">
-              <span>Progresso {Math.round(position.progress * 100)}%</span>
-              <span className="tabular">{position.finished ? "Rota concluída" : `${position.speedKmh} km/h`}</span>
-            </div>
-            <div className="mt-1 h-1.5 rounded-full bg-cosmic-ink/10" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(position.progress * 100)} aria-label="Progresso da rota">
-              <div className="h-full rounded-full bg-cosmic-ink" style={{ width: `${position.progress * 100}%` }} />
-            </div>
-          </div>
-        )}
-        {!tracked && <p className="mt-3 text-xs text-cosmic-ink/70">Viagem ainda não iniciada — sem rastreamento.</p>}
-      </div>
-
-      <ol className="px-5 py-3 space-y-3" aria-live="polite">
-        {shipment.stops.map((stop, i) => {
-          const loc = data.locations.find((l) => l.id === stop.locationId);
-          const progress: StopProgress = position?.stopProgress[i] ?? (stop.actualTime ? "Entregue" : "Pendente");
-          const eta = position?.etaByStop[i] ?? (progress === "Entregue" ? null : stop.plannedTime);
-          const late = eta && stop.windowEnd && new Date(eta) > new Date(stop.windowEnd);
-          return (
-            <li key={stop.id} className="flex gap-3">
-              <span
-                aria-hidden
-                className={`mt-0.5 h-6 w-6 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold border-2 ${
-                  progress === "Entregue" ? "bg-emerald-700 border-emerald-700 text-white" : progress === "Chegou" || progress === "Em descarga" ? "bg-blue-700 border-blue-700 text-white" : progress === "Em rota" ? "border-cosmic-ink text-cosmic-ink" : "border-cosmic-ink/30 text-cosmic-ink/70"
-                }`}
-              >
-                {i === 0 ? "CD" : i}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-cosmic-ink truncate">{loc?.name ?? stop.locationId}</p>
-                <p className="text-xs text-cosmic-ink/70">
-                  {i === 0 ? "Coleta" : progress}
-                  {stop.windowStart && stop.windowEnd && ` · janela ${hhmm(stop.windowStart)}–${hhmm(stop.windowEnd)}`}
-                </p>
-              </div>
-              <div className="text-right text-xs tabular shrink-0">
-                {eta ? <span className={late ? "font-semibold text-red-700" : "text-cosmic-ink/80"}>ETA {hhmm(eta)}</span> : <span className="text-emerald-700">Atendida</span>}
-                {late && <span className="block text-red-700">Fora da janela</span>}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </aside>
-  );
-}
-
-function SimulationControls({
-  clock,
-  tracking,
-  selectedId,
-  hasTracked,
-}: {
-  clock: ClockState;
-  tracking: DemoTrackingProvider;
-  selectedId: string | null;
-  hasTracked: boolean;
-}) {
-  if (!hasTracked) return null;
-  return (
-    <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-2 rounded-lg bg-black/85 px-3 py-2 text-white" role="group" aria-label="Controles da simulação">
-      <span className="text-xs uppercase tracking-wider text-white/70 mr-1">Simulação</span>
-      <button
-        type="button"
-        onClick={() => (clock.playing ? tracking.clock.pause() : tracking.clock.play())}
-        aria-label={clock.playing ? "Pausar simulação" : "Iniciar simulação"}
-        className="h-8 min-w-16 rounded-md bg-white text-cosmic-ink text-xs font-semibold px-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-      >
-        {clock.playing ? "Pausar" : "Iniciar"}
-      </button>
-      <button
-        type="button"
-        onClick={() => tracking.resetTo(selectedId ?? undefined)}
-        aria-label="Reiniciar simulação da rota selecionada"
-        className="h-8 rounded-md border border-white/40 text-xs font-semibold px-3 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-      >
-        Reiniciar
-      </button>
-      <div className="flex items-center gap-1" role="radiogroup" aria-label="Velocidade">
-        {SIMULATION_SPEEDS.map((speed) => (
-          <button
-            key={speed}
-            type="button"
-            role="radio"
-            aria-checked={clock.speed === speed}
-            onClick={() => tracking.clock.setSpeed(speed)}
-            className={`h-8 rounded-md px-2 text-xs font-semibold tabular focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${clock.speed === speed ? "bg-white text-cosmic-ink" : "text-white/85 hover:bg-white/10"}`}
-          >
-            {speed}×
-          </button>
-        ))}
-      </div>
-      <span className="ml-auto text-xs tabular text-white/85" aria-live="off">
-        {new Date(clock.simTimeMs).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: TZ })}
-        <span className="text-white/60"> · 1× = {BASE_RATE / 60} min/s</span>
-      </span>
-    </div>
-  );
-}
-
-function GeoSearch({ geocoder, onPick }: { geocoder: HttpGeocodingProvider; onPick: (r: GeocodeResult) => void }) {
+  const geocoder = useMemo(() => new HttpGeocodingProvider(new CatalogGeocodingProvider(data.locations)), [data.locations]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -454,28 +160,38 @@ function GeoSearch({ geocoder, onPick }: { geocoder: HttpGeocodingProvider; onPi
   };
 
   return (
-    <div className="absolute top-3 left-3 w-[min(320px,calc(100%-24px))]">
-      <form onSubmit={search} role="search" className="flex rounded-md bg-white shadow-lg">
-        <label htmlFor="geo-search" className="sr-only">Buscar endereço ou local</label>
+    <div className="absolute left-3 top-3 z-10 w-[min(320px,calc(100%-72px))]">
+      <form onSubmit={search} role="search" className="flex overflow-hidden rounded-md border border-line-subtle bg-surface shadow-2">
+        <label htmlFor="geo-search" className="sr-only">
+          Buscar endereço ou local
+        </label>
+        <MapPinned aria-hidden className="ml-2.5 mt-2 size-4 shrink-0 text-fg-subtle" />
         <input
           id="geo-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar endereço ou local"
-          className="flex-1 min-w-0 rounded-l-md px-3 py-2 text-sm text-cosmic-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cosmic-ink"
+          className="h-8 min-w-0 flex-1 bg-transparent px-2 text-body-sm text-fg outline-none placeholder:text-fg-subtle focus-visible:outline-none"
         />
-        <button type="submit" disabled={busy} className="rounded-r-md bg-cosmic-ink px-3 text-xs font-semibold text-white disabled:opacity-60">
-          {busy ? "…" : "Buscar"}
+        <button type="submit" disabled={busy} aria-label="Buscar" className="grid w-9 place-items-center border-l border-line-subtle text-fg-muted hover:bg-surface-hover hover:text-fg disabled:opacity-50">
+          {busy ? <Spinner size={13} /> : <Search className="size-4" aria-hidden />}
         </button>
       </form>
       {results && (
-        <ul className="mt-1 rounded-md bg-white shadow-lg text-sm divide-y divide-cosmic-ink/10">
-          {results.length === 0 && <li className="px-3 py-2 text-cosmic-ink/70">Nada encontrado.</li>}
+        <ul className="orb-popover mt-1 overflow-hidden rounded-md border border-line-subtle bg-surface text-body-sm shadow-3" data-state="open">
+          {results.length === 0 && <li className="px-3 py-2 text-fg-muted">Nada encontrado.</li>}
           {results.map((r) => (
             <li key={`${r.label}-${r.position.lat}`}>
-              <button type="button" className="w-full text-left px-3 py-2 hover:bg-cosmic-ink/5" onClick={() => { onPick(r); setResults(null); }}>
+              <button
+                type="button"
+                className="w-full px-3 py-2 text-left hover:bg-surface-hover"
+                onClick={() => {
+                  onPick(r);
+                  setResults(null);
+                }}
+              >
                 {r.label}
-                <span className="block text-xs text-cosmic-ink/60">{r.source === "catalog" ? "Cadastro da operação" : "Google"}</span>
+                <span className="block text-caption text-fg-muted">{r.source === "catalog" ? "Cadastro da operação" : "Google"}</span>
               </button>
             </li>
           ))}

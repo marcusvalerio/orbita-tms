@@ -1,20 +1,32 @@
 import type { GeoPoint, MapHandle, MapMarker, MapProvider, MapScene } from "../types";
-import { MAP_COLORS, POLYLINE_STYLES } from "../marker-style";
+import { POLYLINE_STYLES, markerSvg, clusterSvg, markerRadius } from "../marker-style";
+import { COLOR, DURATION, EASE, prefersReducedMotion } from "../../design/tokens";
 
 // MapProvider esquemático em SVG — sem rede, sem chave, determinístico.
 // Usado quando o Google Maps não está configurado ou falha, e em testes.
-// Projeção Web Mercator ajustada aos limites da cena.
+// Visual 2.0: base clara e dessaturada, câmera animada (fitBounds/panTo),
+// arrastar e zoom, agrupamento de veículos próximos, rótulos e a rota
+// selecionada "desenhada" uma vez.
 
 const NS = "http://www.w3.org/2000/svg";
 const W = 1000;
 const H = 700;
-const PAD = 60;
+const PAD = 90;
+const CLUSTER_PX = 30;
 
 /** Y de Web Mercator na MESMA unidade da longitude (graus), para escala uniforme. */
 export function mercatorY(lat: number) {
   const r = (lat * Math.PI) / 180;
   return (Math.log(Math.tan(Math.PI / 4 + r / 2)) * 180) / Math.PI;
 }
+
+interface View {
+  cx: number; // longitude do centro
+  cy: number; // mercatorY do centro
+  s: number; // px por grau
+}
+
+const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 
 export class SchematicMapProvider implements MapProvider {
   readonly id = "schematic" as const;
@@ -23,79 +35,202 @@ export class SchematicMapProvider implements MapProvider {
   create(container: HTMLElement): MapHandle {
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", "Mapa esquemático da operação");
-    svg.style.cssText = "width:100%;height:100%;display:block;background:#1b1b1b";
-    svg.innerHTML = `<defs><pattern id="orbita-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#2a2a2a" stroke-width="1"/></pattern></defs><rect width="${W}" height="${H}" fill="url(#orbita-grid)"/>`;
+    svg.style.cssText = `width:100%;height:100%;display:block;background:${COLOR.mapLand};touch-action:none;cursor:grab;user-select:none`;
+    svg.innerHTML = `<defs><pattern id="orb-grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="${COLOR.mapGrid}" stroke-width="1"/></pattern><pattern id="orb-grid-lg" width="240" height="240" patternUnits="userSpaceOnUse"><path d="M240 0H0V240" fill="none" stroke="${COLOR.mapGrid}" stroke-width="2"/></pattern></defs><rect class="orb-bg" width="${W}" height="${H}" fill="url(#orb-grid)"/><rect width="${W}" height="${H}" fill="url(#orb-grid-lg)" pointer-events="none"/>`;
     const lines = document.createElementNS(NS, "g");
+    const captions = document.createElementNS(NS, "g");
     const marks = document.createElementNS(NS, "g");
-    svg.append(lines, marks);
+    svg.append(lines, captions, marks);
     container.appendChild(svg);
 
-    let bounds = { minX: -46, maxX: -43, minY: mercatorY(-24), maxY: mercatorY(-22) };
+    let view: View = { cx: -43.3, cy: mercatorY(-22.9), s: 300 };
     let scene: MapScene = { markers: [], polylines: [] };
     let clickListener: ((id: string) => void) | null = null;
+    let anim: number | null = null;
+    let drawnRouteId: string | null = null;
+    const reduced = prefersReducedMotion();
 
-    const project = (p: GeoPoint) => {
-      const sx = (W - 2 * PAD) / (bounds.maxX - bounds.minX || 1);
-      const sy = (H - 2 * PAD) / (bounds.maxY - bounds.minY || 1);
-      const s = Math.min(sx, sy);
-      const ox = (W - s * (bounds.maxX - bounds.minX)) / 2;
-      const oy = (H - s * (bounds.maxY - bounds.minY)) / 2;
-      return { x: ox + (p.lng - bounds.minX) * s, y: H - (oy + (mercatorY(p.lat) - bounds.minY) * s) };
+    const project = (p: GeoPoint) => ({ x: W / 2 + (p.lng - view.cx) * view.s, y: H / 2 - (mercatorY(p.lat) - view.cy) * view.s });
+
+    const animateTo = (target: View, ms: number = DURATION.slow + 120) => {
+      if (anim !== null) cancelAnimationFrame(anim);
+      if (reduced || ms === 0) {
+        view = target;
+        render();
+        return;
+      }
+      const from = view;
+      const t0 = performance.now();
+      const step = (now: number) => {
+        const k = easeOut(Math.min(1, (now - t0) / ms));
+        view = { cx: from.cx + (target.cx - from.cx) * k, cy: from.cy + (target.cy - from.cy) * k, s: from.s * Math.pow(target.s / from.s, k) };
+        render();
+        anim = k < 1 ? requestAnimationFrame(step) : null;
+      };
+      anim = requestAnimationFrame(step);
     };
 
-    const markerNode = (m: MapMarker) => {
-      const { x, y } = project(m.position);
+    const markerNode = (m: MapMarker, pos?: { x: number; y: number }) => {
+      const { x, y } = pos ?? project(m.position);
       const g = document.createElementNS(NS, "g");
-      g.setAttribute("transform", `translate(${x} ${y})`);
+      g.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
       g.setAttribute("data-marker-id", m.id);
       g.setAttribute("role", "button");
       g.setAttribute("tabindex", "0");
       g.setAttribute("aria-label", m.title);
-      g.style.cursor = "pointer";
-      const title = document.createElementNS(NS, "title");
-      title.textContent = m.title;
-      g.appendChild(title);
-      if (m.kind === "vehicle") {
-        g.innerHTML += `<g transform="rotate(${m.headingDeg ?? 0})"><circle r="17" fill="${m.selected ? MAP_COLORS.route : "#f5f5f5"}" stroke="#161616" stroke-width="2.5"/><path d="M0 -10 L8 7 L0 3 L-8 7 Z" fill="${m.selected ? "#fff" : "#161616"}"/></g>`;
-      } else {
-        const fill = m.kind === "origin" ? "#f5f5f5" : m.state === "done" ? MAP_COLORS.done : m.state === "arrived" ? MAP_COLORS.arrived : m.state === "exception" ? MAP_COLORS.exception : "#1b1b1b";
-        const text = m.kind === "origin" || (!m.state || m.state === "pending") ? (m.kind === "origin" ? "#161616" : "#f5f5f5") : "#fff";
-        const r = m.selected ? 17 : 15;
-        g.innerHTML += m.kind === "origin"
-          ? `<rect x="-${r}" y="-${r}" width="${2 * r}" height="${2 * r}" rx="4" fill="${fill}" stroke="#161616" stroke-width="2"/><text text-anchor="middle" dy="4" font-size="11" font-weight="700" fill="${text}">CD</text>`
-          : `<circle r="${r}" fill="${fill}" stroke="#f5f5f5" stroke-width="2"/><text text-anchor="middle" dy="4" font-size="14" font-weight="700" fill="${text}">${m.label ?? ""}</text>`;
-      }
-      const activate = () => clickListener?.(m.id);
+      g.setAttribute("style", `cursor:pointer;opacity:${m.muted ? 0.4 : 1};transition:opacity ${DURATION.base}ms`);
+      g.innerHTML = `<title>${m.title.replace(/</g, "&lt;")}</title>${markerSvg(m)}`;
+      const activate = (e: Event) => {
+        e.stopPropagation();
+        clickListener?.(m.id);
+      };
       g.addEventListener("click", activate);
       g.addEventListener("keydown", (e) => {
-        if ((e as KeyboardEvent).key === "Enter" || (e as KeyboardEvent).key === " ") activate();
+        if ((e as KeyboardEvent).key === "Enter" || (e as KeyboardEvent).key === " ") activate(e);
       });
       return g;
     };
 
-    const render = () => {
-      lines.replaceChildren(
-        ...scene.polylines.map((l) => {
-          const el = document.createElementNS(NS, "polyline");
-          const style = POLYLINE_STYLES[l.kind];
-          el.setAttribute("points", l.path.map((p) => { const q = project(p); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(" "));
-          el.setAttribute("fill", "none");
-          el.setAttribute("stroke", style.strokeColor === MAP_COLORS.route ? "#FF7A3D" : style.strokeColor);
-          el.setAttribute("stroke-opacity", String(style.strokeOpacity));
-          el.setAttribute("stroke-width", String(style.strokeWeight - 1));
-          el.setAttribute("stroke-linejoin", "round");
-          el.setAttribute("stroke-linecap", "round");
-          return el;
-        })
-      );
-      const ordered = [...scene.markers].sort((a, b) => (a.kind === "vehicle" ? 1 : 0) - (b.kind === "vehicle" ? 1 : 0));
-      marks.replaceChildren(...ordered.map(markerNode));
+    const captionNode = (m: MapMarker, x: number, y: number) => {
+      const t = document.createElementNS(NS, "text");
+      const r = markerRadius(m);
+      t.setAttribute("x", (x + r + 6).toFixed(1));
+      t.setAttribute("y", (y + 4).toFixed(1));
+      t.setAttribute("font-size", "12");
+      t.setAttribute("font-weight", m.kind === "vehicle" ? "600" : "500");
+      t.setAttribute("fill", m.kind === "vehicle" ? COLOR.fg : COLOR.mapLabel);
+      t.setAttribute("stroke", COLOR.mapLand);
+      t.setAttribute("stroke-width", "4");
+      t.setAttribute("paint-order", "stroke");
+      t.setAttribute("font-family", m.kind === "vehicle" ? "var(--font-geist-mono),ui-monospace,monospace" : "var(--font-inter),ui-sans-serif,system-ui");
+      t.setAttribute("pointer-events", "none");
+      t.textContent = m.caption ?? "";
+      t.dataset.for = m.id;
+      return t;
     };
 
-    return {
+    const render = () => {
+      // Linhas
+      const routeEls: SVGPolylineElement[] = [];
+      lines.replaceChildren(
+        ...scene.polylines.flatMap((l) => {
+          const style = POLYLINE_STYLES[l.kind];
+          const pts = l.path.map((p) => {
+            const q = project(p);
+            return `${q.x.toFixed(1)},${q.y.toFixed(1)}`;
+          }).join(" ");
+          const mk = (color: string, width: number, opacity: number) => {
+            const el = document.createElementNS(NS, "polyline");
+            el.setAttribute("points", pts);
+            el.setAttribute("fill", "none");
+            el.setAttribute("stroke", color);
+            el.setAttribute("stroke-opacity", String(opacity));
+            el.setAttribute("stroke-width", String(width));
+            el.setAttribute("stroke-linejoin", "round");
+            el.setAttribute("stroke-linecap", "round");
+            if (style.dashed) el.setAttribute("stroke-dasharray", "2 8");
+            return el;
+          };
+          const main = mk(style.strokeColor, style.strokeWeight, style.strokeOpacity);
+          main.dataset.lineId = l.id;
+          if (l.kind === "route") routeEls.push(main);
+          return style.casing ? [mk(COLOR.mapRoad, style.casing, 1), main] : [main];
+        })
+      );
+
+      // Marcadores: veículos por cima; veículos não selecionados próximos viram grupo.
+      const projected = scene.markers.map((m) => ({ m, p: project(m.position) }));
+      const vehicles = projected.filter((x) => x.m.kind === "vehicle" && !x.m.selected);
+      const used = new Set<string>();
+      const clusters: { members: typeof vehicles; x: number; y: number }[] = [];
+      for (const v of vehicles) {
+        if (used.has(v.m.id)) continue;
+        const members = vehicles.filter((o) => !used.has(o.m.id) && Math.hypot(o.p.x - v.p.x, o.p.y - v.p.y) < CLUSTER_PX);
+        members.forEach((o) => used.add(o.m.id));
+        if (members.length > 1) clusters.push({ members, x: members.reduce((a, o) => a + o.p.x, 0) / members.length, y: members.reduce((a, o) => a + o.p.y, 0) / members.length });
+      }
+      const clustered = new Set(clusters.flatMap((c) => c.members.map((o) => o.m.id)));
+      const order = (m: MapMarker) => (m.kind === "vehicle" ? (m.selected ? 3 : 2) : m.selected ? 1 : 0);
+      const visible = projected.filter((x) => !clustered.has(x.m.id)).sort((a, b) => order(a.m) - order(b.m));
+
+      captions.replaceChildren(...visible.filter((x) => x.m.caption).map((x) => captionNode(x.m, x.p.x, x.p.y)));
+      marks.replaceChildren(
+        ...visible.map((x) => markerNode(x.m, x.p)),
+        ...clusters.map((c) => {
+          const g = document.createElementNS(NS, "g");
+          g.setAttribute("transform", `translate(${c.x.toFixed(1)} ${c.y.toFixed(1)})`);
+          g.setAttribute("role", "button");
+          g.setAttribute("tabindex", "0");
+          const label = `${c.members.length} veículos próximos — aproximar`;
+          g.setAttribute("aria-label", label);
+          g.style.cursor = "pointer";
+          g.innerHTML = `<title>${label}</title>${clusterSvg(c.members.length)}`;
+          g.addEventListener("click", (e) => {
+            e.stopPropagation();
+            handle.fitBounds(c.members.map((o) => o.m.position));
+          });
+          return g;
+        })
+      );
+
+      // Rota selecionada desenhada uma vez (motion de seleção).
+      const selected = routeEls[0];
+      if (selected && selected.dataset.lineId !== drawnRouteId) {
+        drawnRouteId = selected.dataset.lineId ?? null;
+        if (!reduced && typeof selected.getTotalLength === "function") {
+          const len = selected.getTotalLength();
+          selected.animate([{ strokeDasharray: `${len} ${len}`, strokeDashoffset: len }, { strokeDasharray: `${len} ${len}`, strokeDashoffset: 0 }], {
+            duration: 640,
+            easing: EASE.standard,
+          });
+        }
+      } else if (!selected) drawnRouteId = null;
+    };
+
+    // Arrastar para mover; roda do mouse para zoom no ponto.
+    let drag: { x: number; y: number; view: View } | null = null;
+    const toSvg = (e: { clientX: number; clientY: number }) => {
+      const r = svg.getBoundingClientRect();
+      const k = Math.min(W / r.width, H / r.height); // "slice": unidades do viewBox por pixel
+      return { x: W / 2 + (e.clientX - r.left - r.width / 2) * k, y: H / 2 + (e.clientY - r.top - r.height / 2) * k, k };
+    };
+    svg.addEventListener("pointerdown", (e) => {
+      if ((e.target as Element).closest("[data-marker-id],[role=button]")) return;
+      drag = { x: e.clientX, y: e.clientY, view };
+      svg.setPointerCapture(e.pointerId);
+      svg.style.cursor = "grabbing";
+    });
+    svg.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const { k } = toSvg(e);
+      view = { ...drag.view, cx: drag.view.cx - ((e.clientX - drag.x) * k) / view.s, cy: drag.view.cy + ((e.clientY - drag.y) * k) / view.s };
+      render();
+    });
+    const endDrag = () => {
+      drag = null;
+      svg.style.cursor = "grab";
+    };
+    svg.addEventListener("pointerup", endDrag);
+    svg.addEventListener("pointercancel", endDrag);
+    svg.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const { x, y } = toSvg(e);
+        const factor = Math.exp(-e.deltaY * 0.0015);
+        const lng = view.cx + (x - W / 2) / view.s;
+        const my = view.cy - (y - H / 2) / view.s;
+        const s = Math.max(20, Math.min(200000, view.s * factor));
+        view = { s, cx: lng - (x - W / 2) / s, cy: my + (y - H / 2) / s };
+        render();
+      },
+      { passive: false }
+    );
+
+    const handle: MapHandle = {
       setScene(next) {
         scene = next;
         render();
@@ -109,27 +244,59 @@ export class SchematicMapProvider implements MapProvider {
             return u ? { ...m, position: u.position, headingDeg: u.headingDeg ?? m.headingDeg } : m;
           }),
         };
-        updates.forEach((u) => {
-          const node = marks.querySelector(`[data-marker-id="${CSS.escape(u.id)}"]`);
-          const m = scene.markers.find((x) => x.id === u.id);
-          if (node && m) node.replaceWith(markerNode(m));
-        });
+        // Caminho rápido: só translada o grupo e gira a seta (sem recriar nós).
+        let needsFull = false;
+        for (const u of updates) {
+          const node = marks.querySelector<SVGGElement>(`[data-marker-id="${CSS.escape(u.id)}"]`);
+          if (!node) {
+            needsFull = true;
+            continue;
+          }
+          const { x, y } = project(u.position);
+          node.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+          if (u.headingDeg !== undefined) node.querySelector(".orb-heading")?.setAttribute("transform", `rotate(${Math.round(u.headingDeg)})`);
+          const m = scene.markers.find((mm) => mm.id === u.id);
+          if (m?.caption) {
+            const cap = captions.querySelector<SVGTextElement>(`[data-for="${CSS.escape(u.id)}"]`);
+            if (cap) {
+              cap.setAttribute("x", (x + markerRadius(m) + 6).toFixed(1));
+              cap.setAttribute("y", (y + 4).toFixed(1));
+            }
+          }
+        }
+        if (needsFull) render();
       },
       fitBounds(points) {
         if (points.length === 0) return;
         const xs = points.map((p) => p.lng);
         const ys = points.map((p) => mercatorY(p.lat));
-        const padX = (Math.max(...xs) - Math.min(...xs)) * 0.08 || 0.02;
-        const padY = (Math.max(...ys) - Math.min(...ys)) * 0.08 || 0.02;
-        bounds = { minX: Math.min(...xs) - padX, maxX: Math.max(...xs) + padX, minY: Math.min(...ys) - padY, maxY: Math.max(...ys) + padY };
-        render();
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const r = svg.getBoundingClientRect();
+        // Área visível em unidades do viewBox (preserveAspectRatio slice).
+        const k = r.width && r.height ? Math.min(W / r.width, H / r.height) : 1;
+        const visW = r.width ? r.width * k : W;
+        const visH = r.height ? r.height * k : H;
+        const sx = (visW - 2 * PAD) / Math.max(maxX - minX, 0.004);
+        const sy = (visH - 2 * PAD) / Math.max(maxY - minY, 0.004);
+        animateTo({ cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, s: Math.min(sx, sy, 60000) });
+      },
+      panTo(point) {
+        animateTo({ ...view, cx: point.lng, cy: mercatorY(point.lat) }, DURATION.slow);
+      },
+      zoomBy(delta) {
+        animateTo({ ...view, s: view.s * Math.pow(1.8, delta) }, DURATION.base + 60);
       },
       onMarkerClick(listener) {
         clickListener = listener;
       },
       destroy() {
+        if (anim !== null) cancelAnimationFrame(anim);
         svg.remove();
       },
     };
+    return handle;
   }
 }

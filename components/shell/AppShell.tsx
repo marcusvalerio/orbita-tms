@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ViewTransition, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { TooltipProvider, Toaster } from "@/components/ds";
 import { useOperation } from "@/components/operation/OperationProvider";
 import { NewOrderModal } from "@/components/simulation/NewOrderModal";
@@ -9,6 +10,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { BottomNav } from "./BottomNav";
 import { CommandMenu } from "./CommandMenu";
+import { LiveOperationProvider } from "@/components/live/LiveOperation";
 
 export type MapConfig = { apiKey: string; mapId: string } | null;
 const MapConfigContext = createContext<MapConfig>(null);
@@ -27,7 +29,9 @@ export function AppShell({ children, mapConfig }: { children: ReactNode; mapConf
     <MapConfigContext.Provider value={mapConfig}>
       <TooltipProvider>
         <ShellProvider>
-          <ShellFrame>{children}</ShellFrame>
+          <LiveOperationProvider>
+            <ShellFrame>{children}</ShellFrame>
+          </LiveOperationProvider>
         </ShellProvider>
       </TooltipProvider>
     </MapConfigContext.Provider>
@@ -37,13 +41,16 @@ export function AppShell({ children, mapConfig }: { children: ReactNode; mapConf
 function ShellFrame({ children }: { children: ReactNode }) {
   const { toasts, dismissToast } = useOperation();
   const { newOrderOpen, setNewOrderOpen } = useShell();
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     try {
       // Preferência por pessoa/dispositivo; lida após a hidratação.
+      // Sem preferência salva: recolhido em telas médias (tablet/laptop pequeno), para o mapa respirar.
+      const stored = localStorage.getItem(COLLAPSE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+      setCollapsed(stored === null ? window.innerWidth < 1280 : stored === "1");
     } catch {
       /* sem armazenamento: menu expandido */
     }
@@ -68,7 +75,8 @@ function ShellFrame({ children }: { children: ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <Header />
           <main id="conteudo" tabIndex={-1} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[calc(var(--orb-bottom-nav-h)+env(safe-area-inset-bottom))] outline-none md:pb-0">
-            <ViewTransition name="orb-workspace">
+            {/* Troca de contexto: só quando o caminho muda (filtros na URL não animam a página). */}
+            <ViewTransition key={pathname} enter="orb-page-enter" exit="orb-page-exit" default="none">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
             </ViewTransition>
           </main>
