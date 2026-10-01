@@ -457,7 +457,7 @@ export interface Column<T> {
   align?: "left" | "right";
   width?: string;
   /** Esconde a coluna abaixo deste breakpoint (a informação vai para o cartão mobile). */
-  hideBelow?: "md" | "lg" | "xl";
+  hideBelow?: "md" | "lg" | "xl" | "2xl";
   mono?: boolean;
 }
 
@@ -520,7 +520,7 @@ export function DataTable<T>({
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const current = Math.min(page, pages - 1);
   const visible = sorted.slice(current * pageSize, current * pageSize + pageSize);
-  const hide = { md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" };
+  const hide = { md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell", "2xl": "hidden 2xl:table-cell" };
   const rowH = density === "compact" ? "h-9" : "h-11";
   const allSelected = selectable && rows.length > 0 && rows.every((r) => selected?.has(rowKey(r)));
   const someSelected = selectable && rows.some((r) => selected?.has(rowKey(r)));

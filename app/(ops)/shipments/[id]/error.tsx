@@ -1,43 +1,29 @@
 "use client";
 
 import { useEffect } from "react";
-
 import Link from "next/link";
+import { Button, ErrorState } from "@/components/ds";
 
-export default function ShipmentError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function ShipmentError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("Erro na interface:", error.digest ?? error.message);
   }, [error]);
-
   return (
-    <div className="h-full flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <div>
-        <p className="font-display font-semibold text-lg text-cosmic-ink mb-1">
-          Não foi possível concluir a ação
-        </p>
-        <p className="text-sm text-cosmic-ink/60">A operação não foi alterada. Tente novamente.</p>
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={reset}
-          className="rounded-md bg-blue-opal text-white text-sm font-medium px-4 py-2 hover:bg-blue-opal/90 transition-colors"
-        >
-          Tentar novamente
-        </button>
-        <Link
-          href="/shipments"
-          className="rounded-md border border-cosmic-ink/15 text-cosmic-ink text-sm font-medium px-4 py-2 hover:bg-cosmic-ink/5 transition-colors"
-        >
-          Voltar para Viagens
-        </Link>
-      </div>
+    <div className="grid flex-1 place-items-center">
+      <ErrorState
+        title="Não foi possível concluir a ação."
+        description="A viagem não foi alterada. Tente novamente."
+        action={
+          <div className="flex gap-2">
+            <Button variant="primary" onClick={reset}>
+              Tentar novamente
+            </Button>
+            <Button asChild>
+              <Link href="/shipments">Voltar para Viagens</Link>
+            </Button>
+          </div>
+        }
+      />
     </div>
   );
 }
