@@ -24,7 +24,7 @@ test("fluxo ponta a ponta: pedido → planejamento → viagem → ocorrência �
   await page.goto("/");
 
   // Pedido: o domínio recusa item sem produto nem descrição e a tela mostra o motivo (L1).
-  await page.getByRole("button", { name: "+ Novo Pedido" }).click();
+  await page.getByRole("button", { name: "Novo pedido" }).click();
   await page.getByRole("button", { name: "Criar Pedido" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "produto do catálogo ou de uma descrição" }).first()).toBeVisible();
   await page.getByLabel("Descrição do item 1").fill("Caixas de medicamentos");
@@ -61,7 +61,8 @@ test("fluxo ponta a ponta: pedido → planejamento → viagem → ocorrência �
 test("cenário demo é coerente: exceção aparece na Central com ocorrência aberta", async ({ page }) => {
   await freshDemo(page, true);
   await page.goto("/");
-  await expect(page.getByText(/ocorrência aguarda resolução/)).toBeVisible();
+  // Command Center: a ocorrência aberta entra na fila "Agora" com o motivo explícito.
+  await expect(page.getByRole("region", { name: "Agora" }).getByText(/Ocorrência .+ aberta/).first()).toBeVisible();
   await page.goto("/shipments");
   await expect(page.getByRole("link", { name: "VIA-00001" })).toBeVisible();
 });

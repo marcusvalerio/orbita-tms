@@ -110,6 +110,17 @@ export function OperationalMap({
         });
       });
     }
+    if (!selected) {
+      // Visão de rede: CDs de origem rotulados, para dar geografia ao mapa.
+      const seen = new Set<string>();
+      for (const s of shipments) {
+        if (!live.plans[s.id] || seen.has(s.originId) || (focusIds && !focusIds.has(s.id))) continue;
+        seen.add(s.originId);
+        const loc = data.locations.find((l) => l.id === s.originId);
+        if (!loc) continue;
+        markers.push({ id: `origin:${s.originId}`, position: { lat: loc.lat, lng: loc.lng }, kind: "origin", title: loc.name, caption: loc.name });
+      }
+    }
     for (const id of live.trackedIds) {
       const s = shipments.find((x) => x.id === id);
       const p = live.tracking.getSnapshot().find((x) => x.shipmentId === id);
@@ -125,7 +136,7 @@ export function OperationalMap({
         headingDeg: p.headingDeg,
         selected: isSel,
         state: trip?.health === "exception" ? "exception" : trip?.health === "late" ? "late" : undefined,
-        caption: isSel ? `${vehicle?.plate ?? s.routeCode ?? s.id} · ${p.finished ? "concluída" : `${p.speedKmh} km/h`}` : undefined,
+        caption: isSel ? `${vehicle?.plate ?? s.routeCode ?? s.id} · ${p.finished ? "concluída" : `${p.speedKmh} km/h`}` : !selectedId ? (s.routeCode ?? s.id) : undefined,
         muted: !!focusIds && !focusIds.has(id),
       });
     }

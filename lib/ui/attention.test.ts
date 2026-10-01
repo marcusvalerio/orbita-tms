@@ -105,3 +105,16 @@ test("níveis", () => {
   assert.equal(levelFor(30, false), "media");
   assert.equal(levelFor(29, false), "baixa");
 });
+
+test("horizonte agrupa paradas por hora de ETA (atrasada / em risco / no prazo)", async () => {
+  const { horizon } = await import("./horizon");
+  const d = data();
+  const { shipment, pos } = tripFixture(d, [600, 30, 600], [0, 48, 90]);
+  const trip = readTrip(d, shipment, pos);
+  const h = horizon([trip], NOW.getTime(), 6);
+  assert.equal(h.buckets.length, 6);
+  assert.equal(h.late, 1);
+  assert.ok(h.ok >= 1);
+  const pending = trip.stops.filter((s) => s.index > 0 && s.state !== "done").length;
+  assert.equal(h.buckets.reduce((n, b) => n + b.late + b.risk + b.ok, 0), pending);
+});

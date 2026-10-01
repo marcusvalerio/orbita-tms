@@ -82,7 +82,9 @@ export function LiveOperationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     tracking.setPlans(trackedIds.map((id) => plans[id]).filter(Boolean));
   }, [tracking, plans, trackedIds]);
-  useEffect(() => () => tracking.dispose(), [tracking]);
+  // Pausa ao desmontar (não descarta: em StrictMode o efeito monta duas vezes e
+  // o descarte removeria a assinatura do relógio criada no construtor).
+  useEffect(() => () => tracking.clock.pause(), [tracking]);
 
   const subscribe = useCallback((cb: () => void) => tracking.subscribe(cb), [tracking]);
   const get = useCallback(() => tracking.getSnapshot(), [tracking]);

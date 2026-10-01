@@ -11,9 +11,9 @@ import { readTrip, hhmm, windowLabel, isFinished, type TripReading, type TripSto
 //   Regra                                         Pontos
 //   ETA excede a janela de uma parada              40 + 1 por min (máx. +25)
 //   Folga até o fim da janela ≤ 15 min             25
-//   Ocorrência aberta  Crítica / Média / Baixa     40 / 25 / 12
+//   Ocorrência aberta  Crítica / Média / Baixa     50 / 35 / 30  (bloqueia a viagem)
 //   Paradas adicionais atrasadas                   +5 cada (máx. +10)
-//   Saída prevista passou e a viagem não iniciou   20 + 1 por 5 min (máx. +15)
+//   Saída prevista passou e a viagem não iniciou   30 + 1 por 5 min (máx. +15)
 //   Prioridade do pedido  Urgente / Alta           10 / 5
 //
 //   Nível: crítica (ocorrência crítica ou ≥ 80) · alta (≥ 55) · média (≥ 30) · baixa
@@ -48,7 +48,7 @@ export interface AttentionItem {
   trip: TripReading;
 }
 
-const OCC_POINTS = { Crítica: 40, Média: 25, Baixa: 12 } as const;
+const OCC_POINTS = { Crítica: 50, Média: 35, Baixa: 30 } as const;
 
 export function levelFor(score: number, criticalOccurrence: boolean): AttentionLevel {
   if (criticalOccurrence || score >= 80) return "critica";
@@ -92,7 +92,7 @@ export function attentionFor(data: OperationDataset, trip: TripReading, nowMs: n
 
   if (s.status === "Planned" && new Date(s.departureTime).getTime() < nowMs) {
     const lateBy = Math.round((nowMs - new Date(s.departureTime).getTime()) / 60000);
-    reasons.push({ code: "not-started", text: `Saída prevista às ${hhmm(s.departureTime)} e a viagem não foi iniciada (${lateBy} min).`, points: 20 + Math.min(15, Math.floor(lateBy / 5)) });
+    reasons.push({ code: "not-started", text: `Saída prevista às ${hhmm(s.departureTime)} e a viagem não foi iniciada (${lateBy} min).`, points: 30 + Math.min(15, Math.floor(lateBy / 5)) });
   }
 
   if (reasons.length === 0) return null;
