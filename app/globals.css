@@ -1,16 +1,193 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   ÓRBITA DESIGN SYSTEM 2.0 — TOKENS
+   Documentação: docs/orbita-2.0/phase-2/DESIGN-SYSTEM.md
+
+   Camadas:
+     1. Primitivos  (--p-*)    paleta crua. Nunca usados direto em componentes.
+     2. Semânticos  (--orb-*)  papel de uso; é o que um tema troca.
+     3. Tailwind    (@theme)   utilitários gerados a partir dos semânticos.
+
+   Regras de cor:
+     · primary  = AÇÃO (Charcoal). Nunca comunica estado.
+     · brand    = marca e SELEÇÃO (Tangerine). Nunca comunica estado.
+     · info / success / warning / danger / critical / exception = ESTADO,
+       sempre acompanhado de ícone + texto (componente <Status>).
+     · route / vehicle / delivery = DOMÍNIO, usados no mapa e na timeline.
+   Contraste validado em lib/design/contrast.test.ts (npm test).
+   ========================================================================== */
+
 :root {
-  /* Paleta ÓRBITA v2 — Tangerine Tango / Charcoal / Platinum / Powder Blue.
-     Os nomes das variáveis (herdados da paleta anterior) foram mantidos de
-     propósito para não exigir nenhuma alteração em componentes — só o
-     valor hexadecimal muda. Mapeamento semântico:
-       cosmic-ink     → Charcoal      (estrutura, navegação, texto forte)
-       milk-mustache  → Platinum      (fundo principal)
-       blue-opal      → Tangerine     (ação/CTA/seleção — antes ocupado pelo azul)
-       cinnamon       → Tangerine     (ocorrência/estado crítico)
-       suez-canal     → Powder Blue   (informação/estado neutro em trânsito)
-       rowdy-orange   → Powder Blue   (atenção/aguardando — menos urgente que crítico) */
+  /* --- 1. Primitivos ------------------------------------------------------ */
+  --p-white: #ffffff;
+  --p-graphite-25: #fbfbf8;
+  --p-graphite-50: #f6f5f0;
+  --p-graphite-100: #efeee7;
+  --p-graphite-150: #e6e4da;
+  --p-graphite-200: #d9d7cc;
+  --p-graphite-300: #c2c0b4;
+  --p-graphite-400: #9b998e;
+  --p-graphite-500: #6f6d65;
+  --p-graphite-600: #57554f;
+  --p-graphite-700: #43423d;
+  --p-graphite-800: #2b2a27;
+  --p-graphite-900: #1f1f1d;
+  --p-graphite-950: #161616;
+
+  --p-tangerine-50: #fff1ea;
+  --p-tangerine-100: #ffdccb;
+  --p-tangerine-500: #ff5b19;
+  --p-tangerine-600: #dc4409;
+  --p-tangerine-700: #b83a0b;
+
+  --p-blue-50: #eaf1fd;
+  --p-blue-200: #bcd2f7;
+  --p-blue-600: #2f6fdb;
+  --p-blue-700: #1f5fcc;
+
+  --p-green-50: #e6f4ec;
+  --p-green-200: #b5dcc5;
+  --p-green-600: #1a8f50;
+  --p-green-700: #11753f;
+
+  --p-amber-50: #fcefc7;
+  --p-amber-200: #f2d58a;
+  --p-amber-500: #e0a100;
+  --p-amber-600: #b87500;
+  --p-amber-800: #7a4b00;
+
+  --p-red-50: #fde7e6;
+  --p-red-200: #f6bdb8;
+  --p-red-600: #d92d20;
+  --p-red-700: #b42318;
+  --p-red-900: #9b1c1c;
+
+  --p-violet-50: #f1eafe;
+  --p-violet-200: #d6c5fb;
+  --p-violet-600: #7c3aed;
+  --p-violet-700: #6d28d9;
+
+  --p-teal-50: #e3f4f7;
+  --p-teal-200: #b3dde5;
+  --p-teal-700: #0e7490;
+
+  /* --- 2. Semânticos (tema claro) ------------------------------------------ */
+  /* Superfícies */
+  --orb-canvas: var(--p-graphite-50);
+  --orb-surface: var(--p-white);
+  --orb-surface-sunken: var(--p-graphite-100);
+  --orb-surface-hover: var(--p-graphite-100);
+  --orb-surface-selected: var(--p-tangerine-50);
+  --orb-chrome: var(--p-graphite-950);
+  --orb-chrome-fg: #f3f2ec;
+  --orb-chrome-muted: #b7b5ab;
+  --orb-chrome-hover: #262624;
+  --orb-overlay: rgb(22 22 22 / 0.36);
+
+  /* Texto */
+  --orb-fg: var(--p-graphite-950);
+  --orb-fg-muted: var(--p-graphite-600);
+  --orb-fg-subtle: var(--p-graphite-500);
+  --orb-fg-disabled: var(--p-graphite-400);
+  --orb-fg-inverse: var(--p-white);
+
+  /* Linhas */
+  --orb-line-subtle: var(--p-graphite-150);
+  --orb-line: var(--p-graphite-200);
+  --orb-line-strong: var(--p-graphite-300);
+
+  /* Ação, marca, foco */
+  --orb-primary: var(--p-graphite-950);
+  --orb-primary-hover: var(--p-graphite-800);
+  --orb-primary-fg: var(--p-white);
+  --orb-brand: var(--p-tangerine-500);
+  --orb-brand-fg: var(--p-tangerine-700);
+  --orb-brand-subtle: var(--p-tangerine-50);
+  --orb-focus: var(--p-graphite-950);
+
+  /* Estado: solid (gráfico/ícone ≥ 3:1) · fg (texto ≥ 4,5:1 sobre subtle) · subtle (fundo) · line (borda) */
+  --orb-neutral: var(--p-graphite-500);
+  --orb-neutral-fg: var(--p-graphite-700);
+  --orb-neutral-subtle: var(--p-graphite-100);
+  --orb-neutral-line: var(--p-graphite-200);
+
+  --orb-info: var(--p-blue-600);
+  --orb-info-fg: var(--p-blue-700);
+  --orb-info-subtle: var(--p-blue-50);
+  --orb-info-line: var(--p-blue-200);
+
+  --orb-success: var(--p-green-600);
+  --orb-success-fg: var(--p-green-700);
+  --orb-success-subtle: var(--p-green-50);
+  --orb-success-line: var(--p-green-200);
+
+  --orb-warning: var(--p-amber-600);
+  --orb-warning-fg: var(--p-amber-800);
+  --orb-warning-subtle: var(--p-amber-50);
+  --orb-warning-line: var(--p-amber-200);
+
+  --orb-danger: var(--p-red-600);
+  --orb-danger-fg: var(--p-red-700);
+  --orb-danger-subtle: var(--p-red-50);
+  --orb-danger-line: var(--p-red-200);
+
+  /* Crítico: escalonamento por PREENCHIMENTO (sólido + texto branco). */
+  --orb-critical: var(--p-red-900);
+  --orb-critical-fg: var(--p-white);
+  --orb-critical-subtle: var(--p-red-900);
+  --orb-critical-line: var(--p-red-900);
+
+  --orb-exception: var(--p-violet-600);
+  --orb-exception-fg: var(--p-violet-700);
+  --orb-exception-subtle: var(--p-violet-50);
+  --orb-exception-line: var(--p-violet-200);
+
+  /* Domínio */
+  --orb-route: var(--p-tangerine-600);
+  --orb-route-muted: var(--p-graphite-400);
+  --orb-route-done: var(--p-graphite-300);
+  --orb-vehicle: var(--p-graphite-950);
+  --orb-delivery: var(--p-teal-700);
+  --orb-delivery-subtle: var(--p-teal-50);
+  --orb-delivery-line: var(--p-teal-200);
+
+  /* Mapa claro e dessaturado */
+  --orb-map-land: #edece5;
+  --orb-map-grid: #e2e0d7;
+  --orb-map-road: #ffffff;
+  --orb-map-water: #d6dfe3;
+  --orb-map-park: #e2e7da;
+  --orb-map-label: var(--p-graphite-600);
+
+  /* Elevação: 0 workspace/regiões · 1 sticky · 2 drawer/painel flutuante · 3 overlay */
+  --orb-shadow-1: 0 1px 0 rgb(22 22 22 / 0.04), 0 1px 2px rgb(22 22 22 / 0.06);
+  --orb-shadow-2: 0 1px 2px rgb(22 22 22 / 0.06), 0 8px 24px -6px rgb(22 22 22 / 0.14);
+  --orb-shadow-3: 0 2px 4px rgb(22 22 22 / 0.06), 0 18px 48px -12px rgb(22 22 22 / 0.28);
+
+  /* --- Motion ---------------------------------------------------------------
+     Rápido e discreto. Entrada = opacidade + deslocamento curto; saída ~30%
+     mais curta; escala só em overlays. Ver docs/orbita-2.0/phase-2/MOTION.md */
+  --orb-duration-instant: 80ms;
+  --orb-duration-fast: 140ms;
+  --orb-duration-base: 200ms;
+  --orb-duration-slow: 320ms;
+  --orb-duration-status: 900ms;
+  --orb-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --orb-ease-enter: cubic-bezier(0, 0, 0, 1);
+  --orb-ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --orb-distance-sm: 4px;
+  --orb-distance-md: 8px;
+  --orb-distance-drawer: 24px;
+
+  /* Layout */
+  --orb-sidebar-w: 232px;
+  --orb-sidebar-w-collapsed: 56px;
+  --orb-header-h: 48px;
+  --orb-bottom-nav-h: 60px;
+  --orb-drawer-w: 440px;
+
+  /* --- Legado (Fase 1) — removido quando todas as telas migrarem --------- */
   --color-cosmic-ink: #161616;
   --color-blue-opal: #ff5b19;
   --color-suez-canal: #aecacd;
@@ -18,11 +195,112 @@
   --color-cinnamon: #ff5b19;
   --color-milk-mustache: #e5e3d2;
 
-  --background: var(--color-milk-mustache);
-  --foreground: var(--color-cosmic-ink);
+  color-scheme: light;
 }
 
+/* Tema escuro: preparado (troca apenas os semânticos), NÃO ativado nesta fase. */
+:root[data-theme="dark"] {
+  --orb-canvas: #121211;
+  --orb-surface: #1a1a19;
+  --orb-surface-sunken: #121211;
+  --orb-surface-hover: #242422;
+  --orb-fg: #f3f2ec;
+  --orb-fg-muted: #b7b5ab;
+  --orb-fg-subtle: #9b998e;
+  --orb-line-subtle: #262624;
+  --orb-line: #33332f;
+  --orb-line-strong: #4a4944;
+  --orb-primary: #f3f2ec;
+  --orb-primary-hover: #ffffff;
+  --orb-primary-fg: #161616;
+  --orb-focus: #f3f2ec;
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    /* Sem deslocamento; opacidade mantida e encurtada. */
+    --orb-distance-sm: 0px;
+    --orb-distance-md: 0px;
+    --orb-distance-drawer: 0px;
+    --orb-duration-slow: 120ms;
+    --orb-duration-base: 120ms;
+    --orb-duration-status: 1ms;
+  }
+}
+
+/* --- 3. Tailwind ------------------------------------------------------------ */
 @theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-canvas: var(--orb-canvas);
+  --color-surface: var(--orb-surface);
+  --color-surface-sunken: var(--orb-surface-sunken);
+  --color-surface-hover: var(--orb-surface-hover);
+  --color-surface-selected: var(--orb-surface-selected);
+  --color-chrome: var(--orb-chrome);
+  --color-chrome-fg: var(--orb-chrome-fg);
+  --color-chrome-muted: var(--orb-chrome-muted);
+  --color-chrome-hover: var(--orb-chrome-hover);
+  --color-overlay: var(--orb-overlay);
+
+  --color-fg: var(--orb-fg);
+  --color-fg-muted: var(--orb-fg-muted);
+  --color-fg-subtle: var(--orb-fg-subtle);
+  --color-fg-disabled: var(--orb-fg-disabled);
+  --color-fg-inverse: var(--orb-fg-inverse);
+
+  --color-line-subtle: var(--orb-line-subtle);
+  --color-line: var(--orb-line);
+  --color-line-strong: var(--orb-line-strong);
+
+  --color-primary: var(--orb-primary);
+  --color-primary-hover: var(--orb-primary-hover);
+  --color-primary-fg: var(--orb-primary-fg);
+  --color-brand: var(--orb-brand);
+  --color-brand-fg: var(--orb-brand-fg);
+  --color-brand-subtle: var(--orb-brand-subtle);
+  --color-focus: var(--orb-focus);
+
+  --color-neutral: var(--orb-neutral);
+  --color-neutral-fg: var(--orb-neutral-fg);
+  --color-neutral-subtle: var(--orb-neutral-subtle);
+  --color-neutral-line: var(--orb-neutral-line);
+  --color-info: var(--orb-info);
+  --color-info-fg: var(--orb-info-fg);
+  --color-info-subtle: var(--orb-info-subtle);
+  --color-info-line: var(--orb-info-line);
+  --color-success: var(--orb-success);
+  --color-success-fg: var(--orb-success-fg);
+  --color-success-subtle: var(--orb-success-subtle);
+  --color-success-line: var(--orb-success-line);
+  --color-warning: var(--orb-warning);
+  --color-warning-fg: var(--orb-warning-fg);
+  --color-warning-subtle: var(--orb-warning-subtle);
+  --color-warning-line: var(--orb-warning-line);
+  --color-danger: var(--orb-danger);
+  --color-danger-fg: var(--orb-danger-fg);
+  --color-danger-subtle: var(--orb-danger-subtle);
+  --color-danger-line: var(--orb-danger-line);
+  --color-critical: var(--orb-critical);
+  --color-critical-fg: var(--orb-critical-fg);
+  --color-critical-subtle: var(--orb-critical-subtle);
+  --color-critical-line: var(--orb-critical-line);
+  --color-exception: var(--orb-exception);
+  --color-exception-fg: var(--orb-exception-fg);
+  --color-exception-subtle: var(--orb-exception-subtle);
+  --color-exception-line: var(--orb-exception-line);
+  --color-route: var(--orb-route);
+  --color-route-muted: var(--orb-route-muted);
+  --color-route-done: var(--orb-route-done);
+  --color-vehicle: var(--orb-vehicle);
+  --color-delivery: var(--orb-delivery);
+  --color-delivery-subtle: var(--orb-delivery-subtle);
+  --color-delivery-line: var(--orb-delivery-line);
+
+  /* legado */
   --color-cosmic-ink: var(--color-cosmic-ink);
   --color-blue-opal: var(--color-blue-opal);
   --color-suez-canal: var(--color-suez-canal);
@@ -30,24 +308,233 @@
   --color-cinnamon: var(--color-cinnamon);
   --color-milk-mustache: var(--color-milk-mustache);
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --shadow-1: var(--orb-shadow-1);
+  --shadow-2: var(--orb-shadow-2);
+  --shadow-3: var(--orb-shadow-3);
 
-  --font-display: var(--font-sora);
-  --font-body: var(--font-roobert);
+  --ease-standard: var(--orb-ease-standard);
+  --ease-enter: var(--orb-ease-enter);
+  --ease-exit: var(--orb-ease-exit);
+}
+
+@theme {
+  /* Tipografia — tamanho / linha / peso. Mínimo absoluto: 12px. */
+  --text-display: 28px;
+  --text-display--line-height: 36px;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.02em;
+  --text-h1: 20px;
+  --text-h1--line-height: 28px;
+  --text-h1--font-weight: 600;
+  --text-h1--letter-spacing: -0.01em;
+  --text-h2: 15px;
+  --text-h2--line-height: 22px;
+  --text-h2--font-weight: 600;
+  --text-h3: 13px;
+  --text-h3--line-height: 20px;
+  --text-h3--font-weight: 600;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-label--font-weight: 500;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+
+  /* Forma */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Durações como utilitários: duration-fast etc. */
+  --animate-orb-fade-in: orb-fade-in var(--orb-duration-fast) var(--orb-ease-enter) both;
+  --animate-orb-rise-in: orb-rise-in var(--orb-duration-base) var(--orb-ease-enter) both;
+  --animate-orb-status: orb-status-flash var(--orb-duration-status) var(--orb-ease-standard) both;
+  --animate-orb-pulse: orb-pulse 1.8s var(--orb-ease-standard) infinite;
+  --animate-orb-shimmer: orb-shimmer 1.4s linear infinite;
+  --animate-orb-spin: orb-spin 0.7s linear infinite;
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--color-milk-mustache);
-  color: var(--color-cosmic-ink);
-  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  background: var(--orb-canvas);
+  color: var(--orb-fg);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Foco: anel de 2px Charcoal com respiro — visível sobre qualquer superfície clara. */
+:focus-visible {
+  outline: 2px solid var(--orb-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.orb-focus-inset:focus-visible {
+  outline-offset: -2px;
+}
+
+::selection {
+  background: var(--p-tangerine-100);
+  color: var(--orb-fg);
+}
+
+/* Números tabulares para tabelas e métricas */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dado operacional: IDs, placas, códigos de rota, horários, distâncias. */
+.orb-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .font-display {
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-display);
 }
 
-/* Números tabulares para tabelas e métricas — alinhamento consistente */
-.tabular {
-  font-variant-numeric: tabular-nums;
+/* Barra de rolagem discreta em regiões de dados */
+.orb-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--orb-line-strong) transparent;
+}
+
+/* ==========================================================================
+   MOTION — keyframes e padrões (ver MOTION.md)
+   ========================================================================== */
+
+@keyframes orb-fade-in {
+  from { opacity: 0; }
+}
+@keyframes orb-fade-out {
+  to { opacity: 0; }
+}
+@keyframes orb-rise-in {
+  from { opacity: 0; transform: translateY(var(--orb-distance-md)); }
+}
+@keyframes orb-sink-out {
+  to { opacity: 0; transform: translateY(var(--orb-distance-sm)); }
+}
+@keyframes orb-pop-in {
+  from { opacity: 0; transform: translateY(var(--orb-distance-sm)) scale(0.98); }
+}
+@keyframes orb-pop-out {
+  to { opacity: 0; transform: scale(0.98); }
+}
+@keyframes orb-drawer-in {
+  from { opacity: 0; transform: translateX(var(--orb-distance-drawer)); }
+}
+@keyframes orb-drawer-out {
+  to { opacity: 0; transform: translateX(var(--orb-distance-drawer)); }
+}
+@keyframes orb-sheet-in {
+  from { transform: translateY(100%); }
+}
+@keyframes orb-sheet-out {
+  to { transform: translateY(100%); }
+}
+@keyframes orb-toast-in {
+  from { opacity: 0; transform: translateY(var(--orb-distance-md)) scale(0.98); }
+}
+@keyframes orb-toast-out {
+  to { opacity: 0; transform: translateX(var(--orb-distance-drawer)); }
+}
+/* Mudança de status: um único flash do fundo para a cor do novo estado. */
+@keyframes orb-status-flash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
+  100% { box-shadow: 0 0 0 6px transparent; }
+}
+@keyframes orb-pulse {
+  0% { transform: scale(1); opacity: 0.55; }
+  70%, 100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes orb-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes orb-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes orb-row-in {
+  from { opacity: 0; transform: translateY(calc(var(--orb-distance-sm) * -1)); background-color: var(--orb-brand-subtle); }
+}
+@keyframes orb-draw {
+  from { stroke-dashoffset: var(--orb-path-length, 2000); }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Overlays Radix: entrada/saída por data-state */
+.orb-overlay[data-state="open"] { animation: orb-fade-in var(--orb-duration-base) var(--orb-ease-enter); }
+.orb-overlay[data-state="closed"] { animation: orb-fade-out var(--orb-duration-fast) var(--orb-ease-exit); }
+.orb-dialog[data-state="open"] { animation: orb-pop-in var(--orb-duration-base) var(--orb-ease-enter); }
+.orb-dialog[data-state="closed"] { animation: orb-pop-out var(--orb-duration-fast) var(--orb-ease-exit); }
+.orb-drawer[data-state="open"] { animation: orb-drawer-in var(--orb-duration-base) var(--orb-ease-enter); }
+.orb-drawer[data-state="closed"] { animation: orb-drawer-out var(--orb-duration-fast) var(--orb-ease-exit); }
+.orb-sheet[data-state="open"] { animation: orb-sheet-in var(--orb-duration-slow) var(--orb-ease-enter); }
+.orb-sheet[data-state="closed"] { animation: orb-sheet-out var(--orb-duration-base) var(--orb-ease-exit); }
+.orb-popover[data-state="open"] { animation: orb-pop-in var(--orb-duration-fast) var(--orb-ease-enter); }
+.orb-popover[data-state="closed"] { animation: orb-fade-out var(--orb-duration-instant) var(--orb-ease-exit); }
+.orb-toast[data-state="open"] { animation: orb-toast-in var(--orb-duration-base) var(--orb-ease-enter); }
+.orb-toast[data-state="closed"] { animation: orb-toast-out var(--orb-duration-fast) var(--orb-ease-exit); }
+.orb-toast[data-swipe="move"] { transform: translateX(var(--radix-toast-swipe-move-x)); }
+.orb-toast[data-swipe="end"] { animation: orb-toast-out var(--orb-duration-fast) var(--orb-ease-exit); }
+
+/* Lista que recebe um item novo (fila, tabela, feed). */
+.orb-enter { animation: orb-rise-in var(--orb-duration-base) var(--orb-ease-enter) both; }
+.orb-row-new { animation: orb-row-in var(--orb-duration-slow) var(--orb-ease-enter) both; }
+/* Escalonamento curto de entrada da fila (máx. 6 itens × 30ms). */
+.orb-stagger > * { animation: orb-rise-in var(--orb-duration-base) var(--orb-ease-enter) both; }
+.orb-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.orb-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.orb-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.orb-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.orb-stagger > *:nth-child(n + 6) { animation-delay: 150ms; }
+
+/* Expansão contextual (altura animável sem medir) */
+.orb-collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--orb-duration-base) var(--orb-ease-standard);
+}
+.orb-collapsible[data-open="true"] { grid-template-rows: 1fr; }
+.orb-collapsible > * { overflow: hidden; min-height: 0; }
+
+/* Skeleton */
+.orb-skeleton {
+  background: linear-gradient(90deg, var(--orb-surface-sunken) 25%, var(--p-graphite-150) 37%, var(--orb-surface-sunken) 63%);
+  background-size: 400% 100%;
+  animation: orb-shimmer 1.4s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* View Transitions (navegação entre contextos): crossfade curto do workspace. */
+::view-transition-old(orb-workspace) {
+  animation: orb-fade-out var(--orb-duration-fast) var(--orb-ease-exit) both;
+}
+::view-transition-new(orb-workspace) {
+  animation: orb-rise-in var(--orb-duration-base) var(--orb-ease-enter) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb-skeleton,
+  [class*="animate-orb-pulse"],
+  [class*="animate-orb-shimmer"] {
+    animation: none !important;
+  }
+  *, ::before, ::after {
+    scroll-behavior: auto !important;
+  }
 }
