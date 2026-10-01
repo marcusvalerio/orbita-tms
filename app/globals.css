@@ -369,6 +369,7 @@
    BASE
    ========================================================================== */
 
+@layer base {
 html {
   -webkit-text-size-adjust: 100%;
 }
@@ -386,7 +387,6 @@ body {
 :focus-visible {
   outline: 2px solid var(--orb-focus);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
 }
 .orb-focus-inset:focus-visible {
   outline-offset: -2px;
@@ -395,6 +395,7 @@ body {
 ::selection {
   background: var(--p-tangerine-100);
   color: var(--orb-fg);
+}
 }
 
 /* Números tabulares para tabelas e métricas */

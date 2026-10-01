@@ -209,6 +209,12 @@ export function Drawer({
         {modal && <D.Overlay className="orb-overlay fixed inset-0 z-40 bg-overlay md:bg-overlay/40" />}
         <D.Content
           onInteractOutside={modal ? undefined : (e) => e.preventDefault()}
+          // Foco vai para o painel (anunciado pelo título), não para o botão fechar.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).focus();
+          }}
+          tabIndex={-1}
           style={width ? ({ "--orb-drawer-w": width } as React.CSSProperties) : undefined}
           className={cn(
             "fixed z-50 flex flex-col bg-surface shadow-3 outline-none",

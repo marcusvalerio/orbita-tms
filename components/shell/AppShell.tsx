@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, ViewTransition, type Re
 import { usePathname } from "next/navigation";
 import { TooltipProvider, Toaster } from "@/components/ds";
 import { useOperation } from "@/components/operation/OperationProvider";
-import { NewOrderModal } from "@/components/simulation/NewOrderModal";
+import { NewOrderDialog } from "@/components/patterns/NewOrderDialog";
 import { ShellProvider, useShell } from "./ShellContext";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
@@ -84,7 +84,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
       </div>
       <BottomNav />
       <CommandMenu />
-      {newOrderOpen && <NewOrderModal onClose={() => setNewOrderOpen(false)} />}
+      {newOrderOpen && <NewOrderDialog open={newOrderOpen} onOpenChange={setNewOrderOpen} />}
       <Toaster toasts={toasts} onDismiss={dismissToast} />
     </>
   );

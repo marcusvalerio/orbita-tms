@@ -1,48 +1,13 @@
-"use client";
-
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { useOperation } from "@/components/operation/OperationProvider";
-import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
-import { PlanningWorkspace } from "@/components/planning/PlanningWorkspace";
+import { LoadingState } from "@/components/ds";
+import { PlanningFlow } from "./PlanningFlow";
 
-function PlanningPageInner() {
-  const { data } = useOperation();
-  const searchParams = useSearchParams();
-  const preselectedOrderId = searchParams.get("order");
-
-  const locationById = new Map(data.locations.map((l) => [l.id, l]));
-  const ordersAwaiting = data.orders.filter((o) => o.status === "Aguardando planejamento");
-
-  return (
-    <>
-      <WorkspaceHeader
-        section="Planejamento"
-        title="Planejamento de Transporte"
-        meta={
-          <span>
-            <span className="tabular">{ordersAwaiting.length} pedidos aguardando planejamento</span>
-            <span className="hidden md:inline"> · Analise, consolide e escolha a melhor alternativa de transporte.</span>
-          </span>
-        }
-      />
-      <PlanningWorkspace
-        orders={ordersAwaiting}
-        locationById={locationById}
-        carriers={data.carriers}
-        vehicles={data.vehicles}
-        preselectedOrderId={preselectedOrderId}
-      />
-    </>
-  );
-}
+export const metadata = { title: "Planejamento" };
 
 export default function PlanningPage() {
   return (
-    <div className="h-full flex flex-col">
-      <Suspense fallback={null}>
-        <PlanningPageInner />
-      </Suspense>
-    </div>
+    <Suspense fallback={<LoadingState />}>
+      <PlanningFlow />
+    </Suspense>
   );
 }
