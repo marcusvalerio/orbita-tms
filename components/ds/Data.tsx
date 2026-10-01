@@ -266,16 +266,9 @@ export function Timeline({ items, label, className }: { items: TimelineItem[]; l
           {i < items.length - 1 && (
             <span aria-hidden className={cn("absolute left-[11px] top-6 bottom-0 w-0.5 transition-colors duration-(--orb-duration-slow)", it.state === "done" ? "bg-success" : "bg-line-subtle")} />
           )}
-          <span
-            aria-hidden
-            className={cn(
-              "relative z-10 grid size-6 shrink-0 place-items-center rounded-full border-2 text-caption font-semibold transition-[background-color,border-color,color] duration-(--orb-duration-base)",
-              dot[it.state],
-              it.state === "active" && "shadow-[0_0_0_4px_color-mix(in_srgb,var(--orb-info)_18%,transparent)]"
-            )}
-          >
+          <TimelineDot state={it.state} className={dot[it.state]}>
             {it.marker}
-          </span>
+          </TimelineDot>
           <div className="min-w-0 flex-1 pt-0.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -289,6 +282,30 @@ export function Timeline({ items, label, className }: { items: TimelineItem[]; l
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Marcador da timeline: muda de cor com transição e "pulsa" uma vez quando o estado muda (ex.: parada concluída). */
+function TimelineDot({ state, className, children }: { state: TimelineItem["state"]; className: string; children: ReactNode }) {
+  const [prev, setPrev] = useState(state);
+  const [changes, setChanges] = useState(0);
+  if (prev !== state) {
+    setPrev(state);
+    setChanges((n) => n + 1);
+  }
+  return (
+    <span
+      key={changes}
+      aria-hidden
+      className={cn(
+        "relative z-10 grid size-6 shrink-0 place-items-center rounded-full border-2 text-caption font-semibold transition-[background-color,border-color,color] duration-(--orb-duration-base)",
+        className,
+        state === "active" && "shadow-[0_0_0_4px_color-mix(in_srgb,var(--orb-info)_18%,transparent)]",
+        changes > 0 && "animate-orb-pop"
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -504,6 +521,15 @@ export function DataTable<T>({
 }) {
   const [sort, setSort] = useState(defaultSort ?? null);
   const [page, setPage] = useState(0);
+  // Linhas que passam a existir entre renders entram com motion (inserção, filtro).
+  const signature = rows.map(rowKey).join("|");
+  const [prevSignature, setPrevSignature] = useState(signature);
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  if (signature !== prevSignature) {
+    const before = new Set(prevSignature.split("|"));
+    setFresh(new Set(rows.map(rowKey).filter((k) => !before.has(k))));
+    setPrevSignature(signature);
+  }
 
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -557,7 +583,7 @@ export function DataTable<T>({
           {visible.map((row) => {
             const key = rowKey(row);
             return (
-              <li key={key} className={cn(newKeys?.has(key) && "orb-row-new")}>
+              <li key={key} className={cn(newKeys?.has(key) ? "orb-row-new" : fresh.has(key) && "orb-enter")}>
                 {onRowClick ? (
                   <button type="button" onClick={() => onRowClick(row)} className={cn("orb-focus-inset block w-full px-4 py-3 text-left", activeKey === key ? "bg-surface-selected" : "active:bg-surface-hover")}>
                     {card(row)}
@@ -632,7 +658,7 @@ export function DataTable<T>({
                     "group orb-focus-inset transition-colors duration-(--orb-duration-instant)",
                     onRowClick && "cursor-pointer",
                     isActive ? "bg-surface-selected" : isSelected ? "bg-surface-hover" : "hover:bg-surface-hover",
-                    newKeys?.has(key) && "orb-row-new"
+                    newKeys?.has(key) ? "orb-row-new" : fresh.has(key) && "orb-enter"
                   )}
                 >
                   {selectable && (

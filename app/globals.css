@@ -349,6 +349,7 @@
   --animate-orb-pulse: orb-pulse 1.8s var(--orb-ease-standard) infinite;
   --animate-orb-shimmer: orb-shimmer 1.4s linear infinite;
   --animate-orb-spin: orb-spin 0.7s linear infinite;
+  --animate-orb-pop: orb-pop-state var(--orb-duration-slow) var(--orb-ease-standard) both;
 }
 
 /* ==========================================================================
@@ -451,6 +452,12 @@ body {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
   100% { box-shadow: 0 0 0 6px transparent; }
 }
+/* Conclusão / mudança de estado de um marcador: cresce e assenta (sem bounce). */
+@keyframes orb-pop-state {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
 @keyframes orb-pulse {
   0% { transform: scale(1); opacity: 0.55; }
   70%, 100% { transform: scale(2.2); opacity: 0; }
@@ -547,7 +554,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .orb-skeleton,
   [class*="animate-orb-pulse"],
-  [class*="animate-orb-shimmer"] {
+  [class*="animate-orb-shimmer"],
+  [class*="animate-orb-pop"],
+  .orb-stagger > * {
     animation: none !important;
   }
   *, ::before, ::after {
