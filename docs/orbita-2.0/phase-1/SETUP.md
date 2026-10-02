@@ -34,6 +34,10 @@ DATABASE_URL=postgres://localhost/orbita_dev npm run db:seed -- --company atlas 
 
 Não definir `ORBITA_AUTH_PROVIDER` (padrão `neon`) nem nenhuma variável `ORBITA_DEV_*` em produção.
 
+Notas da Vercel:
+- Variável do tipo *Sensitive/secret* é criada **uma por ambiente** (aparece uma linha para Production e outra para Preview, com o mesmo nome) — é o esperado.
+- Variável nova só vale para deploys feitos **depois** dela. O *Redeploy* do painel refaz o deploy atual do ambiente escolhido (em Production, o do `main`); para um branch, faça o redeploy a partir do deploy daquele branch ou envie um novo commit.
+
 ### Checklist antes de abrir para usuários
 
 - [ ] Neon Auth → **Trusted domains**: adicionar o domínio de produção.
