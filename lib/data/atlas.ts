@@ -1,4 +1,4 @@
-import type { OperationDataset } from "../domain/types";
+import type { OperationDataset, Delivery } from "../domain/types";
 
 export interface OverviewMetrics {
   orderCount: number;
@@ -14,19 +14,40 @@ export interface OverviewMetrics {
   occurrenceCount: number;
 }
 
-/** Todos os KPIs são derivados do estado atual — nunca hardcoded. Sem movimentação real, o indicador é `null` ("—" na interface), nunca um número decorativo. */
+/** Entrega concluída dentro da janela combinada (ou do dia do prazo, se não houver janela). */
+export function isOnTime(d: Delivery): boolean {
+  return Boolean(d.completedAt) && new Date(d.completedAt!).getTime() <= new Date(d.plannedWindowEnd).getTime();
+}
+
+/**
+ * Todos os KPIs são derivados do estado atual — nunca hardcoded. Sem
+ * movimentação real, o indicador é `null` ("—" na interface).
+ *
+ * - OTD: entregas realizadas (total ou parcial) dentro da janela ÷ entregas encerradas.
+ * - OTIF: entregas realizadas por completo dentro da janela ÷ entregas encerradas.
+ * - Ocupação: média de peso da carga ÷ capacidade do veículo, nas viagens de frota.
+ * - Custo por entrega: frete contratado das viagens encerradas ÷ entregas dessas viagens.
+ */
 export function getOverviewMetrics(data: OperationDataset): OverviewMetrics {
-  const deliveredCount = data.deliveries.filter((d) => d.result === "Delivered").length;
-  const totalDeliveries = data.deliveries.length;
-  const otifPercent = totalDeliveries > 0 ? Math.round((deliveredCount / totalDeliveries) * 1000) / 10 : null;
-  const otdPercent = otifPercent;
+  const closed = data.deliveries.filter((d) => d.completedAt);
+  const pct = (n: number) => (closed.length > 0 ? Math.round((n / closed.length) * 1000) / 10 : null);
+  const otdPercent = pct(closed.filter((d) => (d.result === "Delivered" || d.result === "Partial Delivery") && isOnTime(d)).length);
+  const otifPercent = pct(closed.filter((d) => d.result === "Delivered" && isOnTime(d)).length);
 
-  const totalCapacity = data.vehicles.reduce((s, v) => s + v.capacityKg, 0) || 1;
-  const totalLoadWeight = data.loads.reduce((s, l) => s + l.totalWeightKg, 0);
+  const fleetShipments = data.shipments.filter((s) => s.vehicleId);
+  const ratios = fleetShipments.flatMap((s) => {
+    const vehicle = data.vehicles.find((v) => v.id === s.vehicleId);
+    const load = data.loads.find((l) => l.id === s.loadId);
+    return vehicle && load ? [load.totalWeightKg / vehicle.capacityKg] : [];
+  });
   const occupancyPercent =
-    data.loads.length > 0 ? Math.min(100, Math.round((totalLoadWeight / (totalCapacity * 0.3)) * 1000) / 10) : null;
+    ratios.length > 0 ? Math.round((ratios.reduce((a, b) => a + b, 0) / ratios.length) * 1000) / 10 : null;
 
-  const costPerDelivery = deliveredCount > 0 ? Math.round((totalLoadWeight * 0.8) / deliveredCount) : null;
+  const closedShipmentIds = new Set(closed.map((d) => d.shipmentId));
+  const freightCost = data.freights
+    .filter((f) => closedShipmentIds.has(f.shipmentId))
+    .reduce((sum, f) => sum + f.totalCost, 0);
+  const costPerDelivery = closed.length > 0 && freightCost > 0 ? Math.round(freightCost / closed.length) : null;
 
   const shipmentsWithOpenOccurrence = data.shipments.filter((s) =>
     s.occurrenceIds.some((occId) => data.occurrences.find((o) => o.id === occId && !o.resolved))
@@ -34,6 +55,7 @@ export function getOverviewMetrics(data: OperationDataset): OverviewMetrics {
   const shipmentsInAttention = data.shipments.filter(
     (s) => s.status === "At Delivery" || s.status === "Awaiting Pickup"
   );
+  const activeCount = data.shipments.filter((s) => s.status !== "Delivered" && s.status !== "Closed").length;
 
   return {
     orderCount: data.orders.length,
@@ -44,10 +66,22 @@ export function getOverviewMetrics(data: OperationDataset): OverviewMetrics {
     otdPercent,
     occupancyPercent,
     costPerDelivery,
-    normalCount: Math.max(0, data.shipments.length - shipmentsWithOpenOccurrence.length - shipmentsInAttention.length),
+    normalCount: Math.max(0, activeCount - shipmentsWithOpenOccurrence.length - shipmentsInAttention.length),
     attentionCount: shipmentsInAttention.length,
     occurrenceCount: shipmentsWithOpenOccurrence.length,
   };
+}
+
+/** Paradas ainda não atendidas cuja chegada prevista já ultrapassa o fim da janela. */
+export function getStopsAtRisk(data: OperationDataset) {
+  return data.shipments
+    .filter((s) => s.status === "In Transit" || s.status === "At Delivery" || s.status === "Exception")
+    .flatMap((s) =>
+      s.stops
+        .filter((st) => st.kind === "Entrega" && !st.actualTime && st.windowEnd)
+        .filter((st) => new Date(st.plannedTime).getTime() > new Date(st.windowEnd!).getTime())
+        .map((stop) => ({ shipment: s, stop }))
+    );
 }
 
 export function getActiveShipments(data: OperationDataset, limit = 6) {
@@ -104,16 +138,36 @@ export interface OperationalAlert {
 export function getOperationalAlerts(data: OperationDataset): OperationalAlert[] {
   const alerts: OperationalAlert[] = [];
 
-  const lateDeliveries = data.deliveries.filter((d) => d.result === "Failed" || d.result === "Returned");
+  const lateDeliveries = data.deliveries.filter((d) => d.completedAt && d.result !== "Returned" && d.result !== "Failed" && !isOnTime(d));
   if (lateDeliveries.length > 0) {
     alerts.push({
       id: "late-deliveries",
       message:
         lateDeliveries.length === 1
-          ? "1 entrega ultrapassou a janela prevista."
-          : `${lateDeliveries.length} entregas ultrapassaram a janela prevista.`,
+          ? "1 entrega foi concluída fora da janela prevista."
+          : `${lateDeliveries.length} entregas foram concluídas fora da janela prevista.`,
+      severity: "attention",
+      href: "/deliveries",
+    });
+  }
+
+  const failed = data.deliveries.filter((d) => d.result === "Failed" || d.result === "Returned");
+  if (failed.length > 0) {
+    alerts.push({
+      id: "failed-deliveries",
+      message: failed.length === 1 ? "1 entrega não foi realizada (devolvida ou malsucedida)." : `${failed.length} entregas não foram realizadas (devolvidas ou malsucedidas).`,
       severity: "critical",
       href: "/deliveries",
+    });
+  }
+
+  const atRisk = getStopsAtRisk(data);
+  if (atRisk.length > 0) {
+    alerts.push({
+      id: "stops-at-risk",
+      message: atRisk.length === 1 ? "1 parada tem chegada prevista após a janela do cliente." : `${atRisk.length} paradas têm chegada prevista após a janela do cliente.`,
+      severity: "critical",
+      href: "/shipments",
     });
   }
 
