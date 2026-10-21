@@ -1,5 +1,5 @@
 import { createRng } from "./rng";
-import { generateReferenceData } from "./generate-atlas";
+import { generateReferenceData } from "./reference-data";
 import type { OperationDataset } from "../domain/types";
 
 const REFERENCE_SEED = 8420; // mesma seed dos cadastros — frota/transportadoras/clientes consistentes
