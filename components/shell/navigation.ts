@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Waypoints,
   Boxes,
+  Container,
   Truck,
   IdCard,
   Building,
@@ -66,6 +67,7 @@ export const NAV: NavGroup[] = [
     items: [
       { id: "pedidos", label: "Pedidos", href: "/orders", icon: ClipboardList, match: ["/orders", "/solicitacoes"], badge: newSolicitations, badgeTone: "attention", keywords: "ordens de serviço solicitações caixa de entrada" },
       { id: "planejamento", label: "Planejamento", href: "/planning", icon: Waypoints, badge: awaitingPlanning, badgeTone: "neutral", keywords: "consolidação alternativas" },
+      { id: "carga3d", label: "Carga 3D", href: "/planejamento/carga", icon: Container, match: ["/planejamento"], keywords: "cubagem baú arrumação carregamento 3d" },
       { id: "cargas", label: "Cargas", href: "/loads", icon: Boxes, match: ["/loads", "/contratacao"], badge: awaitingContract, badgeTone: "neutral", keywords: "contratação cotação transporte" },
     ],
   },
