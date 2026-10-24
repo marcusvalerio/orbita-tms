@@ -21,6 +21,7 @@ export interface SceneControl {
   speed: number;
   /** Incrementar para forçar um salto: t = seekTo.t. */
   seek: { t: number; n: number };
+  view: "3d" | "lateral" | "topo";
 }
 
 export function CargoScene({
@@ -45,6 +46,7 @@ export function CargoScene({
   const ctl = useRef(control);
   const cargoRef = useRef<THREE.Group[]>([]);
   const tRef = useRef(0);
+  const setViewRef = useRef<(v: SceneControl["view"]) => void>(() => {});
 
   useEffect(() => {
     cb.current = { onPick, onProgress };
@@ -54,6 +56,10 @@ export function CargoScene({
   useEffect(() => {
     tRef.current = control.seek.t;
   }, [control.seek]);
+
+  useEffect(() => {
+    setViewRef.current(control.view);
+  }, [control.view]);
 
   // Destaque da carga selecionada (sem reconstruir a cena).
   useEffect(() => {
@@ -88,8 +94,8 @@ export function CargoScene({
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xdfe5ea);
-    scene.fog = new THREE.Fog(0xdfe5ea, 4000, 9000);
+    scene.background = new THREE.Color(0xf1eee8);
+    scene.fog = new THREE.Fog(0xf1eee8, 4500, 10000);
 
     const minZ = Math.min(-60, ...lanes.map((l) => l.z0)) - 150;
     const maxZ = Math.max(W + 60, ...lanes.map((l) => l.z1)) + 150;
@@ -100,11 +106,28 @@ export function CargoScene({
 
     const camera = new THREE.PerspectiveCamera(38, 1, 10, 30000);
     const viewDir = new THREE.Vector3(-0.25, 0.85, 0.75).normalize();
+    // Vistas: 3D (pátio + baú), lateral (corte do baú) e topo (planta do baú).
+    let view: SceneControl["view"] = ctl.current.view;
     const fit = () => {
       const vFov = (camera.fov * Math.PI) / 180;
       const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
-      const dist = (radius * 0.68) / Math.sin(Math.min(vFov, hFov) / 2);
-      camera.position.copy(center).addScaledVector(viewDir, dist);
+      const half = Math.min(vFov, hFov) / 2;
+      if (view === "3d") {
+        controls.target.copy(center);
+        camera.position.copy(center).addScaledVector(viewDir, (radius * 0.68) / Math.sin(half));
+      } else {
+        const truckCenter = new THREE.Vector3(L / 2 - 60, H / 2 - 20, W / 2);
+        const r = (L + 260) / 2;
+        const dist = (r / Math.tan(Math.atan(Math.tan(vFov / 2) * camera.aspect))) * 1.08;
+        controls.target.copy(truckCenter);
+        if (view === "lateral") camera.position.set(truckCenter.x, truckCenter.y + 40, W + dist);
+        else camera.position.set(truckCenter.x, H + dist, W / 2 + 1);
+      }
+      controls.update();
+    };
+    setViewRef.current = (v) => {
+      view = v;
+      fit();
     };
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(center);
@@ -141,9 +164,9 @@ export function CargoScene({
     const mat = (color: THREE.ColorRepresentation, p: THREE.MeshStandardMaterialParameters = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...p });
 
     // Rua (asfalto) e doca (concreto)
-    box(maxX + 3000, 2, maxZ - minZ + 3000, mat(0x4b5057), center.x, -DECK - 1, center.z, false);
+    box(maxX + 3000, 2, maxZ - minZ + 3000, mat(0xd9d4cb), center.x, -DECK - 1, center.z, false);
     const dockLen = maxX - L + 200;
-    box(dockLen, DECK, maxZ - minZ + 200, mat(0xb9bcbf), L + 6 + dockLen / 2, -DECK / 2, center.z, false);
+    box(dockLen, DECK, maxZ - minZ + 200, mat(0xf3f0ea), L + 6 + dockLen / 2, -DECK / 2, center.z, false);
     box(14, 30, W + 40, mat(0x1f2328), L + 2, -18, W / 2); // para-choque da doca
     box(6, 4, maxZ - minZ + 200, mat(0xf2c200), L + 10, 0.5, center.z, false); // faixa de borda
 
@@ -178,10 +201,52 @@ export function CargoScene({
         r.position.copy(w.position);
       }
     // cabine
-    const cabMat = mat(0x1d4ed8, { roughness: 0.4, metalness: 0.3 });
-    box(190, 210, W, cabMat, -110, 35, W / 2);
-    box(150, 70, W - 10, mat(0x0f172a, { roughness: 0.1, metalness: 0.5 }), -150, 85, W / 2);
-    box(40, 40, W + 4, mat(0x111111), -200, -60, W / 2);
+    const cabMat = mat(0xf7f7f5, { roughness: 0.35, metalness: 0.15 });
+    const darkGlass = mat(0x1e293b, { roughness: 0.08, metalness: 0.6 });
+    const trim = mat(0x2a2d31, { roughness: 0.7 });
+    box(190, 200, W, cabMat, -110, 30, W / 2);
+    box(150, 40, W - 20, cabMat, -95, 150, W / 2); // teto alto
+    box(4, 70, W - 30, darkGlass, -206, 80, W / 2); // para-brisa
+    box(80, 55, 4, darkGlass, -150, 82, W + 0.5); // janela lateral
+    box(80, 55, 4, darkGlass, -150, 82, -0.5);
+    box(4, 60, W - 60, trim, -206, 5, W / 2); // grade
+    for (let y = -15; y <= 25; y += 10) box(5, 3, W - 70, mat(0x55595f, { metalness: 0.6 }), -207, y, W / 2);
+    box(14, 30, W + 10, trim, -208, -60, W / 2); // para-choque
+    for (const z of [12, W - 12]) box(3, 10, 22, mat(0xfff4c2, { emissive: 0x6b5d1d }), -208.5, -30, z); // faróis
+    box(8, 40, 30, trim, -175, 90, W + 18); // retrovisores
+    box(8, 40, 30, trim, -175, 90, -18);
+
+    // Armazém: parede ao fundo com estantes porta-palete e portas de doca.
+    const wallZ = minZ + 60;
+    const wallLen = maxX - L + 100;
+    box(wallLen, 520, 12, mat(0xfafaf8), L + wallLen / 2, 260 - 0.1, wallZ - 6);
+    const rackBlue = mat(0x1e3a8a, { metalness: 0.4, roughness: 0.5 });
+    const rackOrange = mat(0xf97316, { metalness: 0.3, roughness: 0.5 });
+    const boxMat = mat(0xc79a5b);
+    const rackZ = wallZ + 70;
+    for (let x = L + 260; x < maxX - 120; x += 280) {
+      for (const dx of [0, 270]) box(8, 420, 8, rackBlue, x + dx, 210, rackZ, true);
+      for (const dx of [0, 270]) box(8, 420, 8, rackBlue, x + dx, 210, wallZ + 8, true);
+      for (const y of [0, 140, 280, 410]) {
+        box(270, 8, 6, rackOrange, x + 135, y + 4, rackZ, false);
+        if (y < 400)
+          for (let i = 0; i < 2; i++)
+            box(115, 95 - ((x / 7 + i * 31 + y) % 25), 100, boxMat, x + 70 + i * 130, y + 8 + (95 - ((x / 7 + i * 31 + y) % 25)) / 2, (wallZ + rackZ) / 2, true);
+      }
+    }
+    const frameMat = mat(0x22252a, { roughness: 0.6 });
+    const doorPanel = mat(0xdfe3e8, { metalness: 0.3, roughness: 0.4 });
+    // portas de doca vizinhas (fechadas) e a do caminhão (aberta)
+    for (let i = -2; i <= 2; i++) {
+      const zc = W / 2 + i * (W + 180);
+      if (zc - W / 2 < minZ + 120 || zc + W / 2 > maxZ - 40) continue;
+      box(18, H + 60, 18, frameMat, L + 14, (H + 60) / 2, zc - W / 2 - 22);
+      box(18, H + 60, 18, frameMat, L + 14, (H + 60) / 2, zc + W / 2 + 22);
+      box(18, 22, W + 62, frameMat, L + 14, H + 60, zc);
+      if (i !== 0) box(6, H + 40, W + 30, doorPanel, L + 14, (H + 40) / 2, zc);
+      box(20, 70, 16, mat(0xf2c200), L + 40, 35, zc - W / 2 - 50); // protetor amarelo
+      box(20, 70, 16, mat(0xf2c200), L + 40, 35, zc + W / 2 + 50);
+    }
 
     // Ruas no pátio
     lanes.forEach((ln, i) => {
@@ -189,6 +254,8 @@ export function CargoScene({
       const line = mat(color, { roughness: 0.6 });
       const w = ln.x1 - ln.x0;
       const d = ln.z1 - ln.z0;
+      const fill = mat(color, { transparent: true, opacity: 0.18, depthWrite: false });
+      box(w, 0.4, d, fill, ln.x0 + w / 2, 0.2, ln.z0 + d / 2, false);
       box(w, 0.6, 6, line, ln.x0 + w / 2, 0.3, ln.z0, false);
       box(w, 0.6, 6, line, ln.x0 + w / 2, 0.3, ln.z1, false);
       box(6, 0.6, d, line, ln.x1, 0.3, ln.z0 + d / 2, false);

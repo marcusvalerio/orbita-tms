@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEMO_ITEMS, VEHICLES, packCargo, stagingLayout } from "./cargo";
+import { DEMO_ITEMS, VEHICLES, axleLoads, cgWindow, packCargo, stagingLayout } from "./cargo";
 
 const truck = VEHICLES.find((v) => v.id === "truck")!;
 
@@ -51,4 +51,18 @@ test("pátio: uma rua por parada, A = 1ª entrega, sem sobreposição", () => {
       const o = a.x < b.x + b.dx && b.x < a.x + a.dx && a.y < b.y + b.dy && b.y < a.y + a.dy && a.z < b.z + b.dz && b.z < a.z + a.dz;
       assert.ok(!o, `${a.key} sobrepõe ${b.key} no pátio`);
     }
+});
+
+test("peso por eixo: soma bate com tara + carga e diminui após cada entrega", () => {
+  const r = packCargo(DEMO_ITEMS, truck);
+  const loads = axleLoads(r.placed, DEMO_ITEMS, truck);
+  const a = truck.axles;
+  assert.equal(loads[0].afterStop, 0);
+  assert.ok(Math.abs(loads[0].frontKg + loads[0].rearKg - (a.tareFrontKg + a.tareRearKg + r.weightKg)) <= 1);
+  for (let i = 1; i < loads.length; i++) assert.ok(loads[i].cargoKg < loads[i - 1].cargoKg);
+});
+
+test("janela do CG: carga no CG dentro da janela é legal", () => {
+  const w = cgWindow(5000, truck)!;
+  assert.ok(w.min < w.max);
 });

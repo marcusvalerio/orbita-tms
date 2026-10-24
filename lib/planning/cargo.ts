@@ -31,6 +31,21 @@ export interface Vehicle3D {
   width: number;
   height: number;
   maxWeightKg: number;
+  /** Eixos: posição em cm a partir da parede da cabine (negativo = à frente do baú). */
+  axles: AxleConfig;
+}
+
+export interface AxleConfig {
+  frontLabel: string;
+  rearLabel: string;
+  frontX: number;
+  rearX: number;
+  /** Peso do veículo vazio sobre cada eixo (kg). */
+  tareFrontKg: number;
+  tareRearKg: number;
+  /** Limite por eixo (kg). */
+  limitFrontKg: number;
+  limitRearKg: number;
 }
 
 export interface PlacedBox {
@@ -56,13 +71,37 @@ export interface PackResult {
   weightPercent: number;
 }
 
+// Limites de referência por eixo (Brasil): dianteiro simples 6 t, traseiro simples
+// rodado duplo 10 t, tandem duplo 17 t, tandem triplo 25,5 t. Valores do VUC
+// seguem a capacidade técnica típica. Taras e entre-eixos são aproximados.
+const eixoCaminhao = (frontX: number, rearX: number, tareF: number, tareR: number, limF: number, limR: number, rearLabel = "Traseiro"): AxleConfig => ({
+  frontLabel: "Dianteiro",
+  rearLabel,
+  frontX,
+  rearX,
+  tareFrontKg: tareF,
+  tareRearKg: tareR,
+  limitFrontKg: limF,
+  limitRearKg: limR,
+});
+const eixoCarreta = (length: number, tareF: number, tareR: number): AxleConfig => ({
+  frontLabel: "Cavalo (5ª roda)",
+  rearLabel: "Tandem traseiro",
+  frontX: 90,
+  rearX: length - 250,
+  tareFrontKg: tareF,
+  tareRearKg: tareR,
+  limitFrontKg: 17000,
+  limitRearKg: 25500,
+});
+
 export const VEHICLES: Vehicle3D[] = [
-  { id: "vuc", name: "VUC (baú 4,2 m)", length: 420, width: 210, height: 210, maxWeightKg: 3000 },
-  { id: "toco", name: "Toco (baú 7 m)", length: 700, width: 245, height: 260, maxWeightKg: 6000 },
-  { id: "truck", name: "Truck (baú 8,5 m)", length: 850, width: 245, height: 270, maxWeightKg: 12000 },
-  { id: "carreta", name: "Carreta (baú 14 m)", length: 1400, width: 248, height: 275, maxWeightKg: 27000 },
-  { id: "c20", name: "Contêiner 20'", length: 590, width: 235, height: 239, maxWeightKg: 21700 },
-  { id: "c40", name: "Contêiner 40'", length: 1203, width: 235, height: 239, maxWeightKg: 26500 },
+  { id: "vuc", name: "VUC (baú 4,2 m)", length: 420, width: 210, height: 210, maxWeightKg: 3000, axles: eixoCaminhao(-110, 290, 1700, 1300, 2800, 4400) },
+  { id: "toco", name: "Toco (baú 7 m)", length: 700, width: 245, height: 260, maxWeightKg: 6000, axles: eixoCaminhao(-130, 500, 3000, 2600, 6000, 10000) },
+  { id: "truck", name: "Truck (baú 8,5 m)", length: 850, width: 245, height: 270, maxWeightKg: 12000, axles: eixoCaminhao(-130, 600, 3300, 4400, 6000, 17000, "Tandem traseiro") },
+  { id: "carreta", name: "Carreta (baú 14 m)", length: 1400, width: 248, height: 275, maxWeightKg: 27000, axles: eixoCarreta(1400, 3000, 5500) },
+  { id: "c20", name: "Contêiner 20'", length: 590, width: 235, height: 239, maxWeightKg: 21700, axles: eixoCarreta(590, 2600, 3200) },
+  { id: "c40", name: "Contêiner 40'", length: 1203, width: 235, height: 239, maxWeightKg: 26500, axles: eixoCarreta(1203, 3000, 4800) },
 ];
 
 export const KIND_LABEL: Record<CargoKind, string> = {
@@ -255,4 +294,66 @@ export function stagingLayout(placed: PlacedBox[], items: CargoItem[], originX: 
   }
   for (const s of slots.values()) s.z += shift;
   return { slots, lanes };
+}
+
+// ---------------------------------------------------------------- Peso por eixo
+
+export interface AxleLoad {
+  /** Etapa: 0 = saída; n = depois da n-ésima entrega. */
+  afterStop: number;
+  cargoKg: number;
+  /** Centro de gravidade da carga, cm a partir da parede da cabine (null sem carga). */
+  cgX: number | null;
+  frontKg: number;
+  rearKg: number;
+  frontPercent: number;
+  rearPercent: number;
+  legal: boolean;
+}
+
+/** Distribui o peso entre os eixos pela regra da alavanca, na saída e após cada entrega. */
+export function axleLoads(placed: PlacedBox[], items: CargoItem[], vehicle: Vehicle3D): AxleLoad[] {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const stops = [...new Set(placed.map((p) => byId.get(p.itemId)!.stop))].sort((a, b) => a - b);
+  const a = vehicle.axles;
+  const span = a.rearX - a.frontX;
+  const stages = [0, ...stops.slice(0, -1)];
+  return stages.map((afterStop) => {
+    const onBoard = placed.filter((p) => byId.get(p.itemId)!.stop > afterStop);
+    let kg = 0;
+    let moment = 0;
+    for (const p of onBoard) {
+      const w = byId.get(p.itemId)!.weightKg;
+      kg += w;
+      moment += w * (p.x + p.dx / 2);
+    }
+    const cgX = kg ? moment / kg : null;
+    const rearCargo = cgX === null ? 0 : (kg * (cgX - a.frontX)) / span;
+    const frontKg = Math.round(a.tareFrontKg + kg - rearCargo);
+    const rearKg = Math.round(a.tareRearKg + rearCargo);
+    return {
+      afterStop,
+      cargoKg: kg,
+      cgX: cgX === null ? null : Math.round(cgX),
+      frontKg,
+      rearKg,
+      frontPercent: Math.round((frontKg / a.limitFrontKg) * 100),
+      rearPercent: Math.round((rearKg / a.limitRearKg) * 100),
+      legal: frontKg <= a.limitFrontKg && rearKg <= a.limitRearKg,
+    };
+  });
+}
+
+/** Faixa do centro de gravidade em que os dois eixos ficam dentro do limite (cm). */
+export function cgWindow(cargoKg: number, vehicle: Vehicle3D): { min: number; max: number } | null {
+  if (!cargoKg) return null;
+  const a = vehicle.axles;
+  const span = a.rearX - a.frontX;
+  // rear = tareR + kg*(cg-f)/span ≤ limR  →  cg ≤ f + (limR - tareR)*span/kg
+  // front = tareF + kg - kg*(cg-f)/span ≤ limF  →  cg ≥ f + (tareF + kg - limF)*span/kg
+  const max = a.frontX + ((a.limitRearKg - a.tareRearKg) * span) / cargoKg;
+  const min = a.frontX + ((a.tareFrontKg + cargoKg - a.limitFrontKg) * span) / cargoKg;
+  const lo = Math.max(0, min);
+  const hi = Math.min(vehicle.length, max);
+  return lo <= hi ? { min: Math.round(lo), max: Math.round(hi) } : null;
 }
