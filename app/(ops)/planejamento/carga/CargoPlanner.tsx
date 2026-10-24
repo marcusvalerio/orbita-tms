@@ -532,8 +532,8 @@ function CgRuler({ length, range, stages }: { length: number; range: { min: numb
             <div
               key={s.afterStop}
               className={cn(
-                "absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-semibold",
-                i === 0 ? "z-10 size-5 bg-primary text-primary-fg" : "size-4 border-2 border-primary bg-surface text-fg"
+                "absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-caption font-semibold",
+                i === 0 ? "z-10 size-5 bg-primary text-primary-fg" : "size-5 border-2 border-primary bg-surface text-fg"
               )}
               style={{ left: pos(s.cgX) }}
               title={i === 0 ? "Saída" : `Após ${s.afterStop}ª entrega`}
