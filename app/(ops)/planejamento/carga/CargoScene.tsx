@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { stagingLayout, type CargoItem, type PlacedBox, type Vehicle3D } from "@/lib/planning/cargo";
-import { buildCargo, buildForklift, floorTexture, textSprite } from "./models";
+import { buildCargo, buildForklift, textSprite } from "./models";
+import { buildTruck } from "./truck";
 
 // Cena: baú encostado na doca (piso do baú = piso da doca, y = 0), rua abaixo.
 // Eixos: x = comprimento (0 = cabine, L = porta), z = largura, y = altura (cm).
@@ -116,8 +117,11 @@ export function CargoScene({
         controls.target.copy(center);
         camera.position.copy(center).addScaledVector(viewDir, (radius * 0.68) / Math.sin(half));
       } else {
-        const truckCenter = new THREE.Vector3(L / 2 - 60, H / 2 - 20, W / 2);
-        const r = (L + 260) / 2;
+        // enquadra do para-choque dianteiro até as portas abertas
+        const frontX = vehicle.axles.rearLabel === "Tandem traseiro" && vehicle.axles.frontLabel.startsWith("Cavalo") ? vehicle.axles.frontX - 420 : -260;
+        const backX = L + W / 2 + 20;
+        const truckCenter = new THREE.Vector3((frontX + backX) / 2, H / 2 - 30, W / 2);
+        const r = (backX - frontX) / 2;
         const dist = (r / Math.tan(Math.atan(Math.tan(vFov / 2) * camera.aspect))) * 1.08;
         controls.target.copy(truckCenter);
         if (view === "lateral") camera.position.set(truckCenter.x, truckCenter.y + 40, W + dist);
@@ -170,51 +174,8 @@ export function CargoScene({
     box(14, 30, W + 40, mat(0x1f2328), L + 2, -18, W / 2); // para-choque da doca
     box(6, 4, maxZ - minZ + 200, mat(0xf2c200), L + 10, 0.5, center.z, false); // faixa de borda
 
-    // Baú
-    box(L, 6, W, mat(0xffffff, { map: floorTexture(L, W) }), L / 2, -3, W / 2, false);
-    const panel = mat(0xe9ecef, { roughness: 0.6, metalness: 0.2 });
-    const glass = mat(0xe9ecef, { transparent: true, opacity: 0.16, roughness: 0.2, depthWrite: false });
-    box(L, H, 4, panel, L / 2, H / 2, -2); // parede do fundo
-    box(L, H, 4, glass, L / 2, H / 2, W + 2, false); // parede do lado da câmera: transparente
-    box(4, H, W, panel, -2, H / 2, W / 2); // parede da cabine
-    const ribs = mat(0xc4c9cf, { metalness: 0.4 });
-    for (let x = 0; x <= L; x += 100) box(5, H, 3, ribs, x, H / 2, -4.5);
-    box(L, 5, 6, ribs, L / 2, H, W + 2);
-    box(L, 5, 6, ribs, L / 2, H, -2);
-    // portas abertas
-    const door = mat(0xdde1e5, { metalness: 0.2 });
-    box(5, H, W / 2, door, L + 2, H / 2, -W / 4 - 4).rotation.y = Math.PI / 2;
-    box(5, H, W / 2, door, L + 2, H / 2, W + W / 4 + 4).rotation.y = Math.PI / 2;
-    // chassi e rodas
-    box(L - 40, 25, W - 40, mat(0x222428), L / 2, -22, W / 2);
-    const tire = mat(0x141414, { roughness: 0.95 });
-    const rim = mat(0x9aa0a6, { metalness: 0.7, roughness: 0.3 });
-    const axles = L > 1000 ? [L - 140, L - 260, L - 380] : [L - 160, L > 600 ? L - 280 : -1].filter((x) => x > 0);
-    for (const ax of [...axles, -100])
-      for (const z of [-6, W + 6]) {
-        const w = add(new THREE.Mesh(new THREE.CylinderGeometry(50, 50, 28, 28), tire)) as THREE.Mesh;
-        w.rotation.x = Math.PI / 2;
-        w.position.set(ax, -DECK + 50, z);
-        w.castShadow = true;
-        const r = add(new THREE.Mesh(new THREE.CylinderGeometry(26, 26, 30, 18), rim)) as THREE.Mesh;
-        r.rotation.x = Math.PI / 2;
-        r.position.copy(w.position);
-      }
-    // cabine
-    const cabMat = mat(0xf7f7f5, { roughness: 0.35, metalness: 0.15 });
-    const darkGlass = mat(0x1e293b, { roughness: 0.08, metalness: 0.6 });
-    const trim = mat(0x2a2d31, { roughness: 0.7 });
-    box(190, 200, W, cabMat, -110, 30, W / 2);
-    box(150, 40, W - 20, cabMat, -95, 150, W / 2); // teto alto
-    box(4, 70, W - 30, darkGlass, -206, 80, W / 2); // para-brisa
-    box(80, 55, 4, darkGlass, -150, 82, W + 0.5); // janela lateral
-    box(80, 55, 4, darkGlass, -150, 82, -0.5);
-    box(4, 60, W - 60, trim, -206, 5, W / 2); // grade
-    for (let y = -15; y <= 25; y += 10) box(5, 3, W - 70, mat(0x55595f, { metalness: 0.6 }), -207, y, W / 2);
-    box(14, 30, W + 10, trim, -208, -60, W / 2); // para-choque
-    for (const z of [12, W - 12]) box(3, 10, 22, mat(0xfff4c2, { emissive: 0x6b5d1d }), -208.5, -30, z); // faróis
-    box(8, 40, 30, trim, -175, 90, W + 18); // retrovisores
-    box(8, 40, 30, trim, -175, 90, -18);
+    // Caminhão (baú, chassi, rodas e cabine)
+    add(buildTruck(vehicle, DECK));
 
     // Armazém: parede ao fundo com estantes porta-palete e portas de doca.
     const wallZ = minZ + 60;
