@@ -173,3 +173,86 @@ export function packCargo(items: CargoItem[], vehicle: Vehicle3D): PackResult {
     weightPercent: Math.round((weight / vehicle.maxWeightKg) * 1000) / 10,
   };
 }
+
+// ---------------------------------------------------------------- Pátio (ruas)
+// Antes do carregamento, cada parada ganha uma rua no pátio da doca:
+// rua A = 1ª entrega, rua B = 2ª… A empilhadeira busca rua por rua,
+// começando pela última entrega (que vai para o fundo do baú).
+
+export interface Lane {
+  letter: string;
+  stop: number;
+  customers: string[];
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+export interface StagingLayout {
+  /** Posição no pátio (canto mínimo, y = base) de cada volume carregado, pela key do PlacedBox. */
+  slots: Map<string, { x: number; y: number; z: number }>;
+  lanes: Lane[];
+}
+
+export const laneLetter = (index: number) => String.fromCharCode(65 + (index % 26));
+
+export function stagingLayout(placed: PlacedBox[], items: CargoItem[], originX: number, centerZ: number, rowLength = 720): StagingLayout {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const stops = [...new Set(placed.map((p) => byId.get(p.itemId)!.stop))].sort((a, b) => a - b);
+  const slots = new Map<string, { x: number; y: number; z: number }>();
+  const lanes: Lane[] = [];
+  const GAP = 25;
+  let laneZ = 0;
+
+  stops.forEach((stop, idx) => {
+    const boxes = placed.filter((p) => byId.get(p.itemId)!.stop === stop);
+    let cx = originX + GAP;
+    let cz = laneZ + GAP;
+    let rowDepth = 0;
+    let last: { key: string; itemId: string; x: number; y: number; z: number; dx: number; dy: number; dz: number; level: number } | null = null;
+    let maxX = cx;
+    for (const b of boxes) {
+      const item = byId.get(b.itemId)!;
+      const maxLevels = item.stackable ? Math.max(1, Math.floor(160 / b.dy)) : 1;
+      if (last && last.itemId === b.itemId && last.dx === b.dx && last.dz === b.dz && last.level < maxLevels) {
+        const s: { x: number; y: number; z: number } = { x: last.x, y: last.y + last.dy, z: last.z };
+        slots.set(b.key, s);
+        last = { key: b.key, itemId: last.itemId, x: s.x, y: s.y, z: s.z, dx: last.dx, dy: b.dy, dz: last.dz, level: last.level + 1 };
+        continue;
+      }
+      if (cx + b.dx > originX + rowLength && cx > originX + GAP) {
+        cz += rowDepth + GAP;
+        cx = originX + GAP;
+        rowDepth = 0;
+      }
+      const s = { x: cx, y: 0, z: cz };
+      slots.set(b.key, s);
+      last = { key: b.key, itemId: b.itemId, ...s, dx: b.dx, dy: b.dy, dz: b.dz, level: 1 };
+      cx += b.dx + GAP;
+      maxX = Math.max(maxX, cx);
+      rowDepth = Math.max(rowDepth, b.dz);
+    }
+    const z1 = cz + rowDepth + GAP;
+    lanes.push({
+      letter: laneLetter(idx),
+      stop,
+      customers: [...new Set(boxes.map((b) => byId.get(b.itemId)!.customer))],
+      x0: originX,
+      x1: Math.max(maxX, originX + 300),
+      z0: laneZ,
+      z1,
+    });
+    laneZ = z1 + 90; // corredor entre ruas
+  });
+
+  // Centraliza as ruas em relação ao baú.
+  const total = lanes.length ? lanes[lanes.length - 1].z1 : 0;
+  const shift = centerZ - total / 2;
+  for (const l of lanes) {
+    l.z0 += shift;
+    l.z1 += shift;
+  }
+  for (const s of slots.values()) s.z += shift;
+  return { slots, lanes };
+}

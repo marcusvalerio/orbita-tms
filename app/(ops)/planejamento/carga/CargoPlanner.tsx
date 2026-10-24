@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { Play, RotateCcw, X } from "lucide-react";
+import { FastForward, Pause, Play, RotateCcw, Truck, X } from "lucide-react";
 import { WorkspaceHeader } from "@/components/layout/WorkspaceHeader";
-import { Button, Checkbox, KeyValue, MetricGrid, Progress } from "@/components/ds";
-import { DEMO_ITEMS, KIND_LABEL, VEHICLES, packCargo, type PackResult, type PlacedBox } from "@/lib/planning/cargo";
+import { Button, Checkbox, KeyValue, MetricGrid, Progress, SegmentedControl } from "@/components/ds";
+import { DEMO_ITEMS, KIND_LABEL, VEHICLES, laneLetter, packCargo, type PackResult, type PlacedBox } from "@/lib/planning/cargo";
+import type { SceneControl } from "./CargoScene";
 import { cn } from "@/lib/ui/cn";
 
 // WebGL só no cliente.
@@ -17,9 +18,22 @@ export function CargoPlanner() {
   const [selected, setSelected] = useState<string[]>([]);
   const [result, setResult] = useState<PackResult | null>(null);
   const [focus, setFocus] = useState<{ itemId: string; box?: PlacedBox } | null>(null);
+  const [control, setControl] = useState<SceneControl>({ playing: false, speed: 2, seek: { t: 0, n: 0 } });
+  const [progress, setProgress] = useState({ loaded: 0, done: false });
+  const onProgress = useCallback((loaded: number, done: boolean) => {
+    setProgress({ loaded, done });
+    if (done) setControl((c) => (c.playing ? { ...c, playing: false } : c));
+  }, []);
+  const onPick = useCallback((b: PlacedBox | null) => setFocus(b ? { itemId: b.itemId, box: b } : null), []);
+  const seek = (t: number, playing = false) => setControl((c) => ({ ...c, playing, seek: { t, n: c.seek.n + 1 } }));
 
   const vehicle = VEHICLES.find((v) => v.id === vehicleId)!;
   const ordered = useMemo(() => [...items].sort((a, b) => a.stop - b.stop || a.id.localeCompare(b.id)), [items]);
+  // Rua de cada parada entre as cargas marcadas: A = 1ª entrega.
+  const laneOf = useMemo(() => {
+    const stops = [...new Set(items.filter((i) => selected.includes(i.id)).map((i) => i.stop))].sort((x, y) => x - y);
+    return new Map(stops.map((st, idx) => [st, laneLetter(idx)]));
+  }, [items, selected]);
   const focusItem = focus ? items.find((i) => i.id === focus.itemId) : null;
 
   const toggle = (id: string) => setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -27,6 +41,8 @@ export function CargoPlanner() {
   const apply = () => {
     setResult(packCargo(items.filter((i) => selected.includes(i.id)), vehicle));
     setFocus(null);
+    setProgress({ loaded: 0, done: false });
+    seek(0);
   };
   const clear = () => {
     setResult(null);
@@ -37,7 +53,7 @@ export function CargoPlanner() {
     <div className="flex min-h-0 flex-1 flex-col">
       <WorkspaceHeader
         title="Planejamento de carga 3D"
-        meta="Demonstrativo · marque as cargas e clique em Aplicar. A 1ª parada entra por último e fica junto à porta."
+        meta="Demonstrativo · marque as cargas, separe nas ruas e carregue. A rua A (1ª entrega) entra por último e fica junto à porta."
         actions={
           <>
             <select
@@ -59,7 +75,7 @@ export function CargoPlanner() {
               Limpar
             </Button>
             <Button variant="primary" icon={<Play />} onClick={apply} disabled={!selected.length}>
-              Aplicar carga ({selected.length})
+              Separar nas ruas ({selected.length})
             </Button>
           </>
         }
@@ -74,7 +90,7 @@ export function CargoPlanner() {
               indeterminate={selected.length > 0 && selected.length < items.length}
               onChange={(v) => setSelected(v ? items.map((i) => i.id) : [])}
             />
-            <span>Parada</span>
+            <span>Rua · Parada</span>
           </div>
           <ul>
             {ordered.map((i) => (
@@ -93,6 +109,9 @@ export function CargoPlanner() {
                     </span>
                   </span>
                 </button>
+                <span className="w-5 text-center text-caption font-semibold text-fg-muted" title="Rua no pátio">
+                  {selected.includes(i.id) ? laneOf.get(i.stop) : ""}
+                </span>
                 <input
                   type="number"
                   min={1}
@@ -114,17 +133,47 @@ export function CargoPlanner() {
                 boxes={result.placed}
                 items={items}
                 selectedItemId={focus?.itemId ?? null}
-                onPick={(b) => setFocus(b ? { itemId: b.itemId, box: b } : null)}
+                control={control}
+                onPick={onPick}
+                onProgress={onProgress}
               />
             ) : (
               <div className="flex h-full items-center justify-center p-6 text-center text-body-sm text-fg-muted">
-                Nenhuma carga aplicada. Marque os itens na lista e clique em <strong className="mx-1 text-fg">Aplicar carga</strong>.
+                Nenhuma carga separada. Marque os itens na lista e clique em <strong className="mx-1 text-fg">Separar nas ruas</strong>.
               </div>
             )}
-            {result && (
-              <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 text-caption text-fg-muted">
-                <span>◀ Cabine</span>
-                <span>Porta ▶</span>
+            {result && result.placed.length > 0 && (
+              <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface/95 p-2 shadow-2">
+                {control.playing ? (
+                  <Button size="sm" icon={<Pause />} onClick={() => setControl((c) => ({ ...c, playing: false }))}>
+                    Pausar
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon={<Truck />}
+                    onClick={() => (progress.done ? seek(0, true) : setControl((c) => ({ ...c, playing: true })))}
+                  >
+                    {progress.done ? "Carregar de novo" : progress.loaded ? "Continuar" : "Carregar caminhão"}
+                  </Button>
+                )}
+                <Button size="sm" icon={<FastForward />} onClick={() => seek(result.placed.length)} disabled={progress.done}>
+                  Concluir
+                </Button>
+                <Button size="sm" icon={<RotateCcw />} onClick={() => seek(0)} disabled={!progress.loaded && !control.playing}>
+                  Voltar às ruas
+                </Button>
+                <SegmentedControl
+                  size="sm"
+                  label="Velocidade"
+                  value={String(control.speed)}
+                  onChange={(v) => setControl((c) => ({ ...c, speed: Number(v) }))}
+                  options={[1, 2, 4, 8].map((n) => ({ value: String(n), label: `${n}×` }))}
+                />
+                <span className="ml-auto text-caption tabular text-fg-muted">
+                  {progress.done ? "Carregamento concluído" : `${progress.loaded} de ${result.placed.length} volumes no baú`}
+                </span>
               </div>
             )}
 
