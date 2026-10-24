@@ -36,7 +36,7 @@ export function CargoPlanner() {
   const [selected, setSelected] = useState<string[]>([]);
   const [result, setResult] = useState<PackResult | null>(null);
   const [focus, setFocus] = useState<{ itemId: string; box?: PlacedBox } | null>(null);
-  const [control, setControl] = useState<SceneControl>({ playing: false, speed: 2, seek: { t: 0, n: 0 }, view: "3d" });
+  const [control, setControl] = useState<SceneControl>({ playing: false, speed: 2, seek: { t: 0, n: 0 }, view: "3d", depart: 0 });
   const [progress, setProgress] = useState({ loaded: 0, done: false });
   const [filter, setFilter] = useState<ItemFilter>("todos");
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function CargoPlanner() {
       setProgress({ loaded, done });
       if (done) {
         setControl((c) => (c.playing ? { ...c, playing: false } : c));
-        setNotice(`Carregado: ${loaded} volumes, última entrega primeiro. Eixos ${legal ? "dentro do limite" : "ACIMA do limite"} em todas as etapas.`);
+        setNotice(`Carregado: ${loaded} paletes, última entrega primeiro, portas fechadas. Eixos ${legal ? "dentro do limite" : "ACIMA do limite"} em todas as etapas.`);
       }
     },
     [legal]
@@ -79,12 +79,24 @@ export function CargoPlanner() {
   };
   const chosen = () => items.filter((i) => selected.includes(i.id));
   const lanesCount = (r: PackResult) => new Set(r.placed.map((p) => byId.get(p.itemId)!.stop)).size;
-  const apply = () => plan(chosen(), vehicle, (r) => `Separado em ${lanesCount(r)} ruas: ${r.placed.length} volumes prontos para carregar.`);
+  const apply = () => plan(chosen(), vehicle, (r) => `Paletizado e separado em ${lanesCount(r)} ruas: ${r.placed.length} paletes prontos para carregar.`);
+  const [swapping, setSwapping] = useState(false);
   const changeVehicle = (id: string) => {
-    setVehicleId(id);
     const v = VEHICLES.find((x) => x.id === id)!;
-    // Com carga já separada, replaneja na hora para o novo veículo.
-    if (result) plan(chosen(), v, (r) => `Replanejado para ${v.name}: ${r.placed.length} volumes cabem${r.unplaced.length ? `, ${r.unplaced.reduce((s, u) => s + u.count, 0)} ficam de fora` : ""}.`);
+    if (!result) {
+      setVehicleId(id);
+      return;
+    }
+    // Com carga já separada: o caminhão atual fecha as portas e sai da doca,
+    // depois o novo chega de ré já com a carga replanejada.
+    setSwapping(true);
+    setNotice(`Trocando para ${v.name}…`);
+    setControl((c) => ({ ...c, playing: false, depart: c.depart + 1 }));
+    window.setTimeout(() => {
+      setVehicleId(id);
+      setSwapping(false);
+      plan(chosen(), v, (r) => `Replanejado para ${v.name}: ${r.placed.length} paletes${r.unplaced.length ? `, ${r.unplaced.reduce((s, u) => s + u.count, 0)} volumes ficam de fora` : ""}.`);
+    }, 2300);
   };
   const clear = () => {
     setResult(null);
@@ -116,7 +128,7 @@ export function CargoPlanner() {
   const itemRows = useMemo(() => {
     if (!result) return [];
     const placedCount = new Map<string, number>();
-    for (const p of result.placed) placedCount.set(p.itemId, (placedCount.get(p.itemId) ?? 0) + 1);
+    for (const p of result.placed) placedCount.set(p.itemId, (placedCount.get(p.itemId) ?? 0) + p.count);
     return ordered
       .filter((i) => selected.includes(i.id))
       .map((i) => ({ item: i, placed: placedCount.get(i.id) ?? 0 }))
@@ -141,6 +153,7 @@ export function CargoPlanner() {
               aria-label="Veículo"
               value={vehicleId}
               onChange={(e) => changeVehicle(e.target.value)}
+              disabled={swapping}
               className="h-8 rounded-sm border border-line bg-surface px-2 text-body-sm text-fg"
             >
               {VEHICLES.map((v) => (
@@ -263,7 +276,7 @@ export function CargoPlanner() {
                     variant="primary"
                     icon={<Truck />}
                     onClick={() => {
-                      setNotice(progress.loaded ? null : "Carregando pela última entrega: a empilhadeira busca rua por rua.");
+                      setNotice(progress.loaded ? null : "Carregando pela última entrega: a empilhadeira busca palete por palete, rua por rua.");
                       if (progress.done) seek(0, true);
                       else setControl((c) => ({ ...c, playing: true }));
                     }}
@@ -293,7 +306,7 @@ export function CargoPlanner() {
                   options={[1, 2, 4, 8].map((n) => ({ value: String(n), label: `${n}×` }))}
                 />
                 <span className="ml-auto text-caption tabular text-fg-muted">
-                  {progress.done ? "Carregamento concluído" : `${progress.loaded} de ${result.placed.length} volumes no baú`}
+                  {progress.done ? "Carregamento concluído" : `${progress.loaded} de ${result.placed.length} paletes no baú`}
                 </span>
               </div>
             )}
@@ -317,7 +330,7 @@ export function CargoPlanner() {
                   <KeyValue label="Peso unit." value={kg(focusItem.weightKg)} />
                   <KeyValue label="Dimensões" value={`${focusItem.length}×${focusItem.width}×${focusItem.height} cm`} />
                   <KeyValue label="Empilhável" value={focusItem.stackable ? "Sim" : "Não"} />
-                  {focus?.box && <KeyValue label="Volume" value={`${focus.box.unit} de ${focusItem.quantity}`} />}
+                  {focus?.box && <KeyValue label="Palete" value={`${focus.box.unit} · ${focus.box.count} ${focus.box.count > 1 ? "volumes" : "volume"}`} />}
                   {focus?.box && <KeyValue label="Posição" value={`${meters(focus.box.x)} da cabine`} />}
                 </div>
               </div>
@@ -412,7 +425,7 @@ export function CargoPlanner() {
                 />
                 <Stat label="Ocupação" value={`${Math.round(result.occupancyPercent)}% · ${Math.round(result.weightPercent)}%`} hint="volume · peso" />
                 <Stat label="Ruas usadas" value={`${lanes.length}`} hint={lanes.length ? `mais pesada: Rua ${[...lanes].sort((a, b) => b.weight - a.weight)[0].letter}` : "—"} />
-                <Stat label="Volumes no baú" value={`${result.placed.length} de ${selectedUnits}`} hint={outCount ? `${outCount} ficaram de fora` : "tudo coube"} />
+                <Stat label="Volumes no baú" value={`${result.placed.reduce((s, p) => s + p.count, 0)} de ${selectedUnits}`} hint={outCount ? `${outCount} ficaram de fora` : "tudo coube"} />
               </div>
 
               {/* ------------------------------------------ tabela de itens */}

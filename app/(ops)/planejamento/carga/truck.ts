@@ -259,13 +259,24 @@ function cargoBox(g: THREE.Object3D, L: number, W: number, H: number, container:
   }
   // portas traseiras abertas (encostadas na lateral), com dobradiças e travas
   const doorMat = container ? plain : std(0xe8eaed, { roughness: 0.45, metalness: 0.2 });
-  // folhas abertas a 90°, saindo da porta para trás, com travas e dobradiças
-  for (const z of [-8, W + 8]) {
-    const zOut = z < 0 ? -3 : 3;
-    put(g, new THREE.BoxGeometry(W / 2, H, 4), doorMat, L + W / 4 + 6, H / 2, z);
-    for (const fy of [0.15, 0.5, 0.85]) put(g, new THREE.BoxGeometry(12, 6, 4), M.steel, L + 8, H * fy, z + zOut, false);
-    for (const fx of [0.35, 0.75]) put(g, new THREE.CylinderGeometry(1.8, 1.8, H - 10, 8), M.steel, L + 6 + (W / 2) * fx, H / 2, z + zOut, false);
+  // folhas traseiras com dobradiça: abertas = paralelas à lateral (saindo para trás),
+  // fechadas = cobrindo a abertura. A cena anima userData.doors[].rotation.y.
+  const doors: THREE.Group[] = [];
+  for (const side of [-1, 1] as const) {
+    const pivot = new THREE.Group();
+    pivot.position.set(L + 5, 0, side < 0 ? -5 : W + 5);
+    const leaf = W / 2 + 5;
+    put(pivot, new THREE.BoxGeometry(leaf, H, 4), doorMat, leaf / 2, H / 2, 0);
+    const out = side < 0 ? -3 : 3;
+    for (const fy of [0.15, 0.5, 0.85]) put(pivot, new THREE.BoxGeometry(12, 6, 4), M.steel, 4, H * fy, out, false);
+    for (const fx of [0.35, 0.75]) put(pivot, new THREE.CylinderGeometry(1.8, 1.8, H - 10, 8), M.steel, leaf * fx, H / 2, out, false);
+    // ângulo fechado: folha da esquerda gira para +z, a da direita para -z
+    pivot.userData.closed = side < 0 ? -Math.PI / 2 : Math.PI / 2;
+    pivot.userData.open = 0;
+    g.add(pivot);
+    doors.push(pivot);
   }
+  g.userData.doors = doors;
   // lanternas e para-choque traseiro
   for (const z of [10, W - 10]) {
     put(g, new RoundedBoxGeometry(5, 12, 26, 2, 2), M.red, L + 4, -28, z);

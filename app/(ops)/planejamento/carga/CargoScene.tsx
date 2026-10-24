@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { stagingLayout, type CargoItem, type PlacedBox, type Vehicle3D } from "@/lib/planning/cargo";
-import { buildCargo, buildForklift, textSprite } from "./models";
+import { AISLE, stagingLayout, type CargoItem, type PlacedBox, type Vehicle3D } from "@/lib/planning/cargo";
+import { buildForklift, buildUnit, textSprite } from "./models";
 import { buildTruck } from "./truck";
 
 // Cena: baú encostado na doca (piso do baú = piso da doca, y = 0), rua abaixo.
@@ -14,7 +14,7 @@ import { buildTruck } from "./truck";
 // sendo levado quando k ≤ t < k + 1.
 
 const DECK = 120; // altura do piso do baú em relação à rua
-const YARD_GAP = 380; // distância porta → início das ruas
+const YARD_GAP = 440; // distância porta → início das ruas (corredor da empilhadeira no meio)
 const LANE_COLORS = ["#facc15", "#38bdf8", "#4ade80", "#fb923c", "#c084fc", "#f472b6"];
 
 export interface SceneControl {
@@ -23,6 +23,8 @@ export interface SceneControl {
   /** Incrementar para forçar um salto: t = seekTo.t. */
   seek: { t: number; n: number };
   view: "3d" | "lateral" | "topo";
+  /** Incrementar para o caminhão fechar as portas e sair da doca. */
+  depart: number;
 }
 
 export function CargoScene({
@@ -54,8 +56,9 @@ export function CargoScene({
     ctl.current = control;
   }, [onPick, onProgress, control]);
 
+  const seekRef = useRef<number | null>(control.seek.t);
   useEffect(() => {
-    tRef.current = control.seek.t;
+    seekRef.current = control.seek.t;
   }, [control.seek]);
 
   useEffect(() => {
@@ -99,7 +102,7 @@ export function CargoScene({
     scene.fog = new THREE.Fog(0xf1eee8, 4500, 10000);
 
     const minZ = Math.min(-60, ...lanes.map((l) => l.z0)) - 150;
-    const maxZ = Math.max(W + 60, ...lanes.map((l) => l.z1)) + 150;
+    const maxZ = Math.max(W + 60, ...lanes.map((l) => l.z1 + AISLE)) + 100;
     const maxX = Math.max(yardX + 400, ...lanes.map((l) => l.x1)) + 150;
     const center = new THREE.Vector3((-250 + maxX) / 2, 0, (minZ + maxZ) / 2);
     const span = Math.max(maxX + 250, maxZ - minZ);
@@ -174,8 +177,10 @@ export function CargoScene({
     box(14, 30, W + 40, mat(0x1f2328), L + 2, -18, W / 2); // para-choque da doca
     box(6, 4, maxZ - minZ + 200, mat(0xf2c200), L + 10, 0.5, center.z, false); // faixa de borda
 
-    // Caminhão (baú, chassi, rodas e cabine)
-    add(buildTruck(vehicle, DECK));
+    // Caminhão (baú, chassi, rodas e cabine); chega de ré na doca ao montar a cena
+    const truck = buildTruck(vehicle, DECK);
+    add(truck);
+    const truckDoors = truck.userData.doors as THREE.Group[];
 
     // Armazém: parede ao fundo com estantes porta-palete e portas de doca.
     const wallZ = minZ + 60;
@@ -225,90 +230,143 @@ export function CargoScene({
       add(s);
     });
 
-    // Cargas
-    const order = boxes.map((b) => ({ b, g: buildCargo(byId.get(b.itemId)!, b.dx, b.dy, b.dz), yard: slots.get(b.key)! }));
-    cargoRef.current = order.map((o) => {
-      o.g.userData.box = o.b;
-      add(o.g);
-      return o.g;
+    // Paletes montados
+    const order = boxes.map((b) => {
+      const g = buildUnit(b, byId.get(b.itemId)!);
+      g.userData.box = b;
+      add(g);
+      return { b, g, yard: slots.get(b.key)! };
     });
+    cargoRef.current = order.map((o) => o.g);
 
-    // Empilhadeira
+    // ------------------------------------------------------------ empilhadeira
+    // Roteiro de cada palete, como numa doca de verdade:
+    // corredor → corredor da rua → vira de frente para o palete → entra com o garfo →
+    // levanta → ré → volta ao corredor → alinha com a posição no baú → vira para a
+    // porta → ergue até a altura certa → entra de frente → baixa → ré → baixa o garfo.
+    // Convenção: garfo aponta para -x com yaw 0; frente = (-cos yaw, sin yaw).
     const fork = buildForklift();
     add(fork.group);
-    const rest = new THREE.Vector3(L + 220, 0, W / 2);
-
-    const center3 = (b: PlacedBox, p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x + b.dx / 2, p.y, p.z + b.dz / 2);
-    const lerp = (a: THREE.Vector3, b: THREE.Vector3, u: number) => a.clone().lerp(b, Math.min(1, Math.max(0, u)));
-    const ease = (u: number) => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
-    /** Caminho em segmentos com tempos relativos. */
-    const path = (pts: THREE.Vector3[], u: number) => {
-      const lens = pts.slice(1).map((p, i) => p.distanceTo(pts[i]) + 1);
-      const tot = lens.reduce((s, x) => s + x, 0);
-      let d = u * tot;
-      for (let i = 0; i < lens.length; i++) {
-        if (d <= lens[i]) return lerp(pts[i], pts[i + 1], ease(d / lens[i]));
-        d -= lens[i];
-      }
-      return pts[pts.length - 1].clone();
+    const CX = L + 250;
+    const REST = { x: CX, z: W / 2 };
+    type Pose = { x: number; z: number; yaw: number; lift: number };
+    type Phase = "antes" | "levando" | "depois";
+    type Seg = { t0: number; dur: number; box: number; from: Pose; to: Pose; phase: Phase };
+    const DRIVE = 240; // cm/s
+    const TURN = Math.PI / 1.6; // rad/s
+    const LIFT = 60; // cm/s
+    const segs: Seg[] = [];
+    const starts: number[] = [];
+    let clockT = 0;
+    let pose: Pose = { x: REST.x, z: REST.z, yaw: 0, lift: 0 };
+    const angDiff = (a: number, b: number) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+    const push = (box: number, to: Pose, dur: number, phase: Phase) => {
+      const d = Math.max(dur, 0.05);
+      segs.push({ t0: clockT, dur: d, box, from: pose, to, phase });
+      clockT += d;
+      pose = to;
     };
+    const turnTo = (box: number, yaw: number, phase: Phase) => {
+      const d = angDiff(pose.yaw, yaw);
+      if (Math.abs(d) > 0.01) push(box, { ...pose, yaw: pose.yaw + d }, Math.abs(d) / TURN + 0.1, phase);
+    };
+    const drive = (box: number, x: number, z: number, phase: Phase, reverse = false) => {
+      const dist = Math.hypot(x - pose.x, z - pose.z);
+      if (dist < 1) return;
+      if (!reverse) turnTo(box, Math.atan2(z - pose.z, -(x - pose.x)), phase);
+      push(box, { ...pose, x, z }, dist / DRIVE + 0.2, phase);
+    };
+    const lift = (box: number, h: number, phase: Phase) => push(box, { ...pose, lift: h }, Math.abs(h - pose.lift) / LIFT + 0.3, phase);
+
+    order.forEach((o, k) => {
+      starts.push(clockT);
+      const b = o.b;
+      const reach = b.dx / 2 + 6; // centro do palete à frente do mastro
+      const lane = lanes.find((l) => l.stop === byId.get(b.itemId)!.stop)!;
+      const tx = b.x + b.dx / 2;
+      const tz = b.z + b.dz / 2;
+      drive(k, CX, lane.aisleZ, "antes");
+      drive(k, o.yard.x, lane.aisleZ, "antes");
+      turnTo(k, -Math.PI / 2, "antes");
+      drive(k, o.yard.x, o.yard.z + reach, "antes");
+      lift(k, 12, "levando");
+      drive(k, o.yard.x, lane.aisleZ, "levando", true);
+      drive(k, CX, lane.aisleZ, "levando");
+      drive(k, CX, tz, "levando");
+      turnTo(k, 0, "levando");
+      lift(k, b.y + 12, "levando");
+      drive(k, tx + reach, tz, "levando");
+      lift(k, b.y, "levando");
+      drive(k, CX, tz, "depois", true);
+      lift(k, 0, "depois");
+      drive(k, REST.x, REST.z, "depois");
+      turnTo(k, 0, "depois");
+    });
+    const total = clockT;
+    starts.push(total);
+
+    const easeIO = (u: number) => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
+    const lerpN = (a: number, b: number, u: number) => a + (b - a) * u;
+    let segIdx = 0;
+    const poseAt = (t: number): { pose: Pose; seg: Seg | null } => {
+      if (!segs.length || t >= total) return { pose: { x: REST.x, z: REST.z, yaw: 0, lift: 0 }, seg: null };
+      if (segIdx >= segs.length || segs[segIdx].t0 > t) segIdx = 0;
+      while (segIdx < segs.length - 1 && t >= segs[segIdx].t0 + segs[segIdx].dur) segIdx++;
+      const sg = segs[segIdx];
+      const u = easeIO(Math.min(1, Math.max(0, (t - sg.t0) / sg.dur)));
+      return {
+        pose: { x: lerpN(sg.from.x, sg.to.x, u), z: lerpN(sg.from.z, sg.to.z, u), yaw: lerpN(sg.from.yaw, sg.to.yaw, u), lift: lerpN(sg.from.lift, sg.to.lift, u) },
+        seg: sg,
+      };
+    };
+
+    // ------------------------------------------------- caminhão: chegada, portas e saída
+    let arrive = 0; // 0 → 1 ao encostar na doca
+    let departAt: number | null = null;
+    const departSeen = ctl.current.depart;
+    let doorAmt = 1; // 1 = fechada
+    const easeOut = (u: number) => 1 - (1 - u) ** 3;
+    const easeIn = (u: number) => u * u * u;
 
     let lastLoaded = -1;
     let lastDone = false;
-    const apply = (t: number) => {
+    const apply = (t: number, now: number, dt: number) => {
       const n = order.length;
-      const k = Math.min(n, Math.max(0, Math.floor(t)));
-      const u = t - k;
-      let forkPos = rest.clone();
-      let forkY = 0;
+      const done = n > 0 && t >= total;
+      // posição do caminhão
+      let truckX = -(1 - easeOut(arrive)) * 2600;
+      if (departAt !== null) {
+        const d = Math.min(1, (now - departAt) / 2.4);
+        truckX = -easeIn(Math.max(0, (d - 0.3) / 0.7)) * 3400;
+      }
+      truck.position.x = truckX;
+      // portas: fechadas chegando, saindo ou com o carregamento concluído
+      const wantClosed = arrive < 0.9 || departAt !== null || done;
+      doorAmt = Math.min(1, Math.max(0, doorAmt + (wantClosed ? 1 : -1) * dt * 1.4));
+      for (const d of truckDoors) d.rotation.y = d.userData.closed * easeIO(doorAmt);
+
+      const { pose: p, seg } = poseAt(t);
+      const k = seg ? seg.box : n;
+      let loaded = 0;
       order.forEach((o, i) => {
-        const target = center3(o.b, o.b);
-        const yard = center3(o.b, o.yard);
-        if (i < k) o.g.position.copy(target);
-        else if (i > k || k >= n) o.g.position.copy(yard);
-        else {
-          // fases: ir até a carga → levantar → levar até a porta → entrar → baixar → voltar
-          const lift = Math.max(8, o.b.y + 6);
-          const offX = o.b.dx / 2 + 6;
-          const doorPt = new THREE.Vector3(L + offX + 140, lift, target.z);
-          const pick = yard.clone();
-          const pickUp = pick.clone().setY(Math.max(pick.y + 8, 8));
-          if (u < 0.22) {
-            const f = path([rest, new THREE.Vector3(pick.x + offX + 160, 0, pick.z), new THREE.Vector3(pick.x + offX, 0, pick.z)], u / 0.22);
-            forkPos = f;
-            forkY = Math.max(0, pick.y - 2);
-            o.g.position.copy(yard);
-          } else if (u < 0.3) {
-            const v = (u - 0.22) / 0.08;
-            o.g.position.copy(lerp(pick, pickUp, v));
-            forkPos = new THREE.Vector3(pick.x + offX, 0, pick.z);
-            forkY = o.g.position.y;
-          } else if (u < 0.78) {
-            const v = (u - 0.3) / 0.48;
-            const p = path(
-              [pickUp, new THREE.Vector3(pick.x + 160, pickUp.y, pick.z), new THREE.Vector3(doorPt.x, pickUp.y, doorPt.z), doorPt, new THREE.Vector3(target.x, lift, target.z)],
-              v
-            );
-            o.g.position.copy(p);
-            forkPos = new THREE.Vector3(p.x + offX, 0, p.z);
-            forkY = p.y;
-          } else if (u < 0.86) {
-            const v = (u - 0.78) / 0.08;
-            o.g.position.copy(lerp(new THREE.Vector3(target.x, lift, target.z), target, v));
-            forkPos = new THREE.Vector3(target.x + offX, 0, target.z);
-            forkY = o.g.position.y;
-          } else {
-            const v = (u - 0.86) / 0.14;
-            o.g.position.copy(target);
-            forkPos = path([new THREE.Vector3(target.x + offX, 0, target.z), new THREE.Vector3(doorPt.x, 0, target.z), rest], v);
-            forkY = Math.max(0, o.b.y * (1 - v));
-          }
+        const inTruck = i < k || (i === k && seg?.phase === "depois");
+        const carried = i === k && seg?.phase === "levando";
+        if (inTruck) {
+          loaded++;
+          o.g.position.set(o.b.x + o.b.dx / 2 + truckX, o.b.y, o.b.z + o.b.dz / 2);
+          o.g.rotation.y = 0;
+        } else if (carried) {
+          const reach = o.b.dx / 2 + 6;
+          o.g.position.set(p.x - Math.cos(p.yaw) * reach, p.lift, p.z + Math.sin(p.yaw) * reach);
+          o.g.rotation.y = p.yaw;
+        } else {
+          o.g.position.set(o.yard.x, 0, o.yard.z);
+          o.g.rotation.y = -Math.PI / 2;
         }
       });
-      fork.group.position.copy(forkPos);
-      fork.carriage.position.y = forkY;
-      const loaded = Math.min(n, Math.floor(t));
-      const done = t >= n;
+      fork.group.position.set(p.x, 0, p.z);
+      fork.group.rotation.y = p.yaw;
+      fork.carriage.position.y = p.lift;
       if (loaded !== lastLoaded || done !== lastDone) {
         lastLoaded = loaded;
         lastDone = done;
@@ -346,12 +404,22 @@ export function CargoScene({
 
     const clock = new THREE.Clock();
     let raf = 0;
-    const SECONDS_PER_BOX = 2.4;
+    tRef.current = 0;
     const loop = () => {
       const dt = Math.min(clock.getDelta(), 0.1);
+      const now = clock.elapsedTime;
       const c = ctl.current;
-      if (c.playing && tRef.current < order.length) tRef.current = Math.min(order.length, tRef.current + (dt * c.speed) / SECONDS_PER_BOX);
-      apply(tRef.current);
+      // salto pedido pela tela (em paletes): converte para o tempo do roteiro
+      if (seekRef.current !== null) {
+        const idx = Math.max(0, Math.min(order.length, Math.round(seekRef.current)));
+        tRef.current = starts[idx];
+        seekRef.current = null;
+      }
+      if (c.depart !== departSeen && departAt === null) departAt = now;
+      arrive = Math.min(1, arrive + dt / 2.8);
+      // a empilhadeira só trabalha com o caminhão encostado e de portas abertas
+      if (c.playing && arrive >= 1 && doorAmt <= 0.05 && tRef.current < total) tRef.current = Math.min(total, tRef.current + dt * c.speed);
+      apply(tRef.current, now, dt);
       controls.update();
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);

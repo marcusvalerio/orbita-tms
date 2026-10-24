@@ -48,14 +48,24 @@ export interface AxleConfig {
   limitRearKg: number;
 }
 
+/** Volume de carga já unitizado (um palete montado), posicionado no baú. */
 export interface PlacedBox {
+  /** Identificador do palete (ex.: "P3-2" = 2º palete do item P3). */
   key: string;
   itemId: string;
+  /** Número do palete dentro do item (1, 2…). */
   unit: number;
+  /** Quantidade de volumes do item neste palete. */
+  count: number;
+  weightKg: number;
+  /** Pode receber outro palete por cima. */
+  stackable: boolean;
+  /** Arranjo das peças sobre o palete (relativo ao centro da base, y = topo do estrado). */
+  cases: { x: number; y: number; z: number; dx: number; dy: number; dz: number }[];
   x: number;
   y: number;
   z: number;
-  /** Dimensões já rotacionadas: dx (comprimento), dy (altura), dz (largura). */
+  /** Dimensões no baú: dx (comprimento), dy (altura), dz (largura). */
   dx: number;
   dy: number;
   dz: number;
@@ -114,90 +124,171 @@ export const KIND_LABEL: Record<CargoKind, string> = {
 };
 
 export const DEMO_ITEMS: CargoItem[] = [
-  { id: "P1", name: "Palete de bebidas", kind: "palete", description: "Refrigerante lata 350 ml, 120 fardos filmados", customer: "Mercado Bom Preço", stop: 1, length: 120, width: 100, height: 150, weightKg: 900, quantity: 4, stackable: false, color: "#3b82f6" },
-  { id: "P2", name: "Geladeira duplex", kind: "eletro", description: "Refrigerador 480 L frost free, embalagem original", customer: "Casa & Lar Eletro", stop: 2, length: 75, width: 80, height: 185, weightKg: 85, quantity: 3, stackable: false, color: "#10b981" },
-  { id: "P3", name: "Caixas de calçados", kind: "caixa", description: "Tênis esportivo, 12 pares por caixa", customer: "Loja Passo Certo", stop: 2, length: 60, width: 40, height: 40, weightKg: 14, quantity: 18, stackable: true, color: "#f59e0b" },
-  { id: "P4", name: "Tambor de óleo", kind: "tambor", description: "Óleo lubrificante 200 L, lacrado", customer: "Auto Peças Rota", stop: 3, length: 60, width: 60, height: 90, weightKg: 190, quantity: 6, stackable: false, color: "#64748b" },
-  { id: "P5", name: "Louças e vidros", kind: "fragil", description: "Jogos de pratos e taças — não empilhar, manusear com cuidado", customer: "Casa & Lar Eletro", stop: 2, length: 50, width: 50, height: 45, weightKg: 18, quantity: 6, stackable: false, color: "#ec4899" },
+  { id: "P1", name: "Palete de bebidas", kind: "palete", description: "Refrigerante lata 350 ml, 120 fardos filmados", customer: "Mercado Bom Preço", stop: 1, length: 120, width: 100, height: 150, weightKg: 900, quantity: 2, stackable: false, color: "#3b82f6" },
+  { id: "P2", name: "Geladeira duplex", kind: "eletro", description: "Refrigerador 480 L frost free, embalagem original", customer: "Casa & Lar Eletro", stop: 2, length: 75, width: 80, height: 185, weightKg: 85, quantity: 2, stackable: false, color: "#10b981" },
+  { id: "P3", name: "Caixas de calçados", kind: "caixa", description: "Tênis esportivo, 12 pares por caixa", customer: "Loja Passo Certo", stop: 2, length: 60, width: 40, height: 40, weightKg: 14, quantity: 16, stackable: true, color: "#f59e0b" },
+  { id: "P4", name: "Tambor de óleo", kind: "tambor", description: "Óleo lubrificante 200 L, lacrado", customer: "Auto Peças Rota", stop: 3, length: 60, width: 60, height: 90, weightKg: 190, quantity: 4, stackable: false, color: "#64748b" },
+  { id: "P5", name: "Louças e vidros", kind: "fragil", description: "Jogos de pratos e taças — não empilhar, manusear com cuidado", customer: "Casa & Lar Eletro", stop: 2, length: 50, width: 50, height: 45, weightKg: 18, quantity: 4, stackable: false, color: "#ec4899" },
   { id: "P6", name: "Sacos de ração", kind: "saco", description: "Ração animal 25 kg, paletizada", customer: "Agro Campo Verde", stop: 4, length: 120, width: 100, height: 110, weightKg: 1000, quantity: 2, stackable: false, color: "#a16207" },
-  { id: "P7", name: "Caixas de eletrônicos", kind: "caixa", description: "Monitores 27\" — 2 por caixa", customer: "TecInfo Distribuidora", stop: 1, length: 70, width: 50, height: 50, weightKg: 16, quantity: 10, stackable: true, color: "#8b5cf6" },
+  { id: "P7", name: "Caixas de eletrônicos", kind: "caixa", description: "Monitores 27\" — 2 por caixa", customer: "TecInfo Distribuidora", stop: 1, length: 70, width: 50, height: 50, weightKg: 16, quantity: 6, stackable: true, color: "#8b5cf6" },
   { id: "P8", name: "Máquina de lavar", kind: "eletro", description: "Lavadora 12 kg, embalagem original", customer: "Casa & Lar Eletro", stop: 2, length: 65, width: 70, height: 105, weightKg: 45, quantity: 4, stackable: true, color: "#14b8a6" },
-  { id: "P9", name: "Caixas de medicamentos", kind: "fragil", description: "Carga controlada, temperatura ambiente", customer: "Farma Vida", stop: 3, length: 40, width: 30, height: 30, weightKg: 6, quantity: 20, stackable: true, color: "#ef4444" },
+  { id: "P9", name: "Caixas de medicamentos", kind: "fragil", description: "Carga controlada, temperatura ambiente", customer: "Farma Vida", stop: 3, length: 40, width: 30, height: 30, weightKg: 6, quantity: 18, stackable: true, color: "#ef4444" },
 ];
 
 const EPS = 0.001;
 const overlap = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 - EPS && b0 < a1 - EPS;
 
+// ---------------------------------------------------------------- Paletização
+// Tudo vai sobre palete PBR (120 × 100 cm, estrado de 15 cm): caixas em camadas,
+// tambores de 4 em 4, eletrodomésticos e frágeis em uma só camada. Itens que já
+// são palete (bebidas, sacaria) entram como estão.
+
+export const PALLET = { length: 120, width: 100, deck: 15, tareKg: 25, maxHeight: 175 };
+
+export type PalletUnit = Omit<PlacedBox, "x" | "y" | "z">;
+
+export function palletize(items: CargoItem[]): PalletUnit[] {
+  const units: PalletUnit[] = [];
+  for (const item of items) {
+    if (item.kind === "palete" || item.kind === "saco") {
+      for (let u = 1; u <= item.quantity; u++)
+        units.push({
+          key: `${item.id}-${u}`,
+          itemId: item.id,
+          unit: u,
+          count: 1,
+          weightKg: item.weightKg,
+          stackable: item.stackable,
+          cases: [],
+          dx: item.length,
+          dy: item.height,
+          dz: item.width,
+        });
+      continue;
+    }
+    // melhor orientação da peça na camada
+    const fit = (l: number, w: number) => Math.floor(PALLET.length / l) * Math.floor(PALLET.width / w);
+    const turned = fit(item.width, item.length) > fit(item.length, item.width);
+    const cl = turned ? item.width : item.length;
+    const cw = turned ? item.length : item.width;
+    const nx = Math.max(1, Math.floor(PALLET.length / cl));
+    const nz = Math.max(1, Math.floor(PALLET.width / cw));
+    const singleLayer = !item.stackable;
+    const layers = singleLayer ? 1 : Math.max(1, Math.floor((PALLET.maxHeight - PALLET.deck) / item.height));
+    const perPallet = nx * nz * layers;
+    let left = item.quantity;
+    let u = 0;
+    while (left > 0) {
+      u++;
+      const count = Math.min(perPallet, left);
+      left -= count;
+      const cases: PalletUnit["cases"] = [];
+      // espalha as peças pela base (centralizado) e sobe camada por camada
+      const gx = (PALLET.length - nx * cl) / 2;
+      const gz = (PALLET.width - nz * cw) / 2;
+      for (let k = 0; k < count; k++) {
+        const layer = Math.floor(k / (nx * nz));
+        const i = k % (nx * nz);
+        const ix = i % nx;
+        const iz = Math.floor(i / nx);
+        cases.push({ x: -PALLET.length / 2 + gx + cl * (ix + 0.5), y: layer * item.height, z: -PALLET.width / 2 + gz + cw * (iz + 0.5), dx: cl, dy: item.height, dz: cw });
+      }
+      const usedLayers = Math.ceil(count / (nx * nz));
+      units.push({
+        key: `${item.id}-${u}`,
+        itemId: item.id,
+        unit: u,
+        count,
+        weightKg: count * item.weightKg + PALLET.tareKg,
+        // palete só recebe outro por cima se as peças aguentam e ele está completo e plano
+        stackable: item.stackable && !singleLayer && count % (nx * nz) === 0,
+        cases,
+        dx: PALLET.length,
+        dy: PALLET.deck + usedLayers * item.height,
+        dz: PALLET.width,
+      });
+    }
+  }
+  return units;
+}
+
 /**
- * Empacota os itens selecionados por pontos extremos.
+ * Paletiza e arruma os paletes por pontos extremos.
  * Ordem: última parada primeiro (vai para a cabine), primeira parada por último (porta).
- * Dentro da mesma parada: não empilháveis e maiores primeiro.
  */
 export function packCargo(items: CargoItem[], vehicle: Vehicle3D): PackResult {
-  const sorted = [...items].sort(
-    (a, b) => b.stop - a.stop || Number(a.stackable) - Number(b.stackable) || b.length * b.width * b.height - a.length * a.width * a.height
-  );
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const units = palletize(items).sort((a, b) => {
+    const sa = byId.get(a.itemId)!.stop;
+    const sb = byId.get(b.itemId)!.stop;
+    return sb - sa || Number(b.stackable) - Number(a.stackable) || b.weightKg - a.weightKg;
+  });
   const placed: PlacedBox[] = [];
   const unplacedMap = new Map<string, { count: number; reason: string }>();
   let points: [number, number, number][] = [[0, 0, 0]];
   let weight = 0;
-  const byId = new Map(items.map((i) => [i.id, i]));
 
-  const fits = (x: number, y: number, z: number, dx: number, dy: number, dz: number) => {
+  const fits = (x: number, y: number, z: number, dx: number, dy: number, dz: number, kg: number) => {
     if (x + dx > vehicle.length + EPS || y + dy > vehicle.height + EPS || z + dz > vehicle.width + EPS) return false;
     for (const p of placed) {
       if (overlap(x, x + dx, p.x, p.x + p.dx) && overlap(y, y + dy, p.y, p.y + p.dy) && overlap(z, z + dz, p.z, p.z + p.dz)) return false;
     }
     if (y > EPS) {
-      // Apoio: precisa estar sobre caixas empilháveis cobrindo ao menos 70% da base.
-      let support = 0;
-      for (const p of placed) {
-        if (Math.abs(p.y + p.dy - y) > EPS) continue;
-        const ox = Math.min(x + dx, p.x + p.dx) - Math.max(x, p.x);
-        const oz = Math.min(z + dz, p.z + p.dz) - Math.max(z, p.z);
-        if (ox <= EPS || oz <= EPS) continue;
-        if (!byId.get(p.itemId)?.stackable) return false;
-        support += ox * oz;
-      }
-      if (support < dx * dz * 0.7) return false;
+      // em cima de outro palete: precisa de apoio total num palete empilhável de mesma base
+      const base = placed.find((p) => Math.abs(p.y + p.dy - y) < EPS && Math.abs(p.x - x) < EPS && Math.abs(p.z - z) < EPS && p.dx === dx && p.dz === dz);
+      // e nunca um palete mais pesado sobre um mais leve
+      if (!base || !base.stackable || base.y > EPS || kg > base.weightKg) return false;
     }
     return true;
   };
+  const skip = (u: PalletUnit, reason: string) => {
+    const e = unplacedMap.get(u.itemId) ?? { count: 0, reason };
+    e.count += u.count;
+    unplacedMap.set(u.itemId, e);
+  };
 
-  for (const item of sorted) {
-    // Rotação só no plano do piso (nunca deitar a carga).
-    const orientations: [number, number, number][] = [
-      [item.length, item.height, item.width],
-      [item.width, item.height, item.length],
-    ];
-    for (let unit = 1; unit <= item.quantity; unit++) {
-      if (weight + item.weightKg > vehicle.maxWeightKg) {
-        const u = unplacedMap.get(item.id) ?? { count: 0, reason: "Excede o peso máximo do veículo" };
-        u.count++;
-        unplacedMap.set(item.id, u);
-        continue;
-      }
-      // Preferir mais perto da cabine, depois mais baixo, depois à esquerda.
-      points.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-      let done = false;
-      for (const [x, y, z] of points) {
-        for (const [dx, dy, dz] of orientations) {
-          if (!fits(x, y, z, dx, dy, dz)) continue;
-          placed.push({ key: `${item.id}-${unit}`, itemId: item.id, unit, x, y, z, dx, dy, dz });
-          weight += item.weightKg;
-          points = points.filter((p) => !(p[0] === x && p[1] === y && p[2] === z));
-          points.push([x + dx, y, z], [x, y + dy, z], [x, y, z + dz]);
-          done = true;
-          break;
-        }
-        if (done) break;
-      }
-      if (!done) {
-        const u = unplacedMap.get(item.id) ?? { count: 0, reason: "Sem espaço disponível no baú" };
-        u.count++;
-        unplacedMap.set(item.id, u);
-      }
+  for (const u of units) {
+    if (weight + u.weightKg > vehicle.maxWeightKg) {
+      skip(u, "Excede o peso máximo do veículo");
+      continue;
     }
+    // palete pode entrar de frente ou atravessado; atravessado primeiro quando
+    // cabem dois lado a lado (ex.: baú de 2,45 m leva 2 PBR transversais)
+    const crosswise = vehicle.width >= 2 * u.dx;
+    const orient: [number, number][] = crosswise
+      ? [
+          [u.dz, u.dx],
+          [u.dx, u.dz],
+        ]
+      : [
+          [u.dx, u.dz],
+          [u.dz, u.dx],
+        ];
+    points.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    let done = false;
+    for (const [x, y, z] of points) {
+      for (const [dx, dz] of orient) {
+        if (!fits(x, y, z, dx, u.dy, dz, u.weightKg)) continue;
+        const turned = dx !== u.dx;
+        placed.push({
+          ...u,
+          // peças giram junto com o palete atravessado
+          cases: turned ? u.cases.map((c) => ({ ...c, x: c.z, z: -c.x, dx: c.dz, dz: c.dx })) : u.cases,
+          x,
+          y,
+          z,
+          dx,
+          dz,
+        });
+        weight += u.weightKg;
+        points = points.filter((p) => !(p[0] === x && p[1] === y && p[2] === z));
+        points.push([x + dx, y, z], [x, y + u.dy, z], [x, y, z + dz]);
+        done = true;
+        break;
+      }
+      if (done) break;
+    }
+    if (!done) skip(u, "Sem espaço disponível no baú");
   }
 
   const volumeTotal = (vehicle.length * vehicle.width * vehicle.height) / 1e6;
@@ -215,8 +306,11 @@ export function packCargo(items: CargoItem[], vehicle: Vehicle3D): PackResult {
 
 // ---------------------------------------------------------------- Pátio (ruas)
 // Antes do carregamento, cada parada ganha uma rua no pátio da doca:
-// rua A = 1ª entrega, rua B = 2ª… A empilhadeira busca rua por rua,
-// começando pela última entrega (que vai para o fundo do baú).
+// rua A = 1ª entrega, rua B = 2ª… Cada rua é uma fileira de paletes com um
+// corredor à frente (lado +z) por onde a empilhadeira entra de frente.
+// No pátio o palete fica girado 90° (garfo entra pelo lado +z).
+
+export const AISLE = 380;
 
 export interface Lane {
   letter: string;
@@ -224,73 +318,56 @@ export interface Lane {
   customers: string[];
   x0: number;
   x1: number;
+  /** Faixa da fileira de paletes. */
   z0: number;
   z1: number;
+  /** Centro do corredor de acesso (lado +z da fileira). */
+  aisleZ: number;
 }
 
 export interface StagingLayout {
-  /** Posição no pátio (canto mínimo, y = base) de cada volume carregado, pela key do PlacedBox. */
-  slots: Map<string, { x: number; y: number; z: number }>;
+  /** Centro de cada palete no pátio, pela key do PlacedBox. */
+  slots: Map<string, { x: number; z: number }>;
   lanes: Lane[];
 }
 
 export const laneLetter = (index: number) => String.fromCharCode(65 + (index % 26));
 
-export function stagingLayout(placed: PlacedBox[], items: CargoItem[], originX: number, centerZ: number, rowLength = 720): StagingLayout {
+export function stagingLayout(placed: PlacedBox[], items: CargoItem[], originX: number, centerZ: number): StagingLayout {
   const byId = new Map(items.map((i) => [i.id, i]));
   const stops = [...new Set(placed.map((p) => byId.get(p.itemId)!.stop))].sort((a, b) => a - b);
-  const slots = new Map<string, { x: number; y: number; z: number }>();
+  const slots = new Map<string, { x: number; z: number }>();
   const lanes: Lane[] = [];
-  const GAP = 25;
-  let laneZ = 0;
-
+  const GAP = 35;
+  let z = 0;
   stops.forEach((stop, idx) => {
+    // no pátio só ficam paletes de base (os de cima são pegos como volumes próprios)
     const boxes = placed.filter((p) => byId.get(p.itemId)!.stop === stop);
-    let cx = originX + GAP;
-    let cz = laneZ + GAP;
-    let rowDepth = 0;
-    let last: { key: string; itemId: string; x: number; y: number; z: number; dx: number; dy: number; dz: number; level: number } | null = null;
-    let maxX = cx;
+    // girado 90°: extensão em x = dz, em z = dx (comprimento ao longo do garfo)
+    const depth = Math.max(...boxes.map((b) => b.dx));
+    let x = originX + GAP;
     for (const b of boxes) {
-      const item = byId.get(b.itemId)!;
-      const maxLevels = item.stackable ? Math.max(1, Math.floor(160 / b.dy)) : 1;
-      if (last && last.itemId === b.itemId && last.dx === b.dx && last.dz === b.dz && last.level < maxLevels) {
-        const s: { x: number; y: number; z: number } = { x: last.x, y: last.y + last.dy, z: last.z };
-        slots.set(b.key, s);
-        last = { key: b.key, itemId: last.itemId, x: s.x, y: s.y, z: s.z, dx: last.dx, dy: b.dy, dz: last.dz, level: last.level + 1 };
-        continue;
-      }
-      if (cx + b.dx > originX + rowLength && cx > originX + GAP) {
-        cz += rowDepth + GAP;
-        cx = originX + GAP;
-        rowDepth = 0;
-      }
-      const s = { x: cx, y: 0, z: cz };
-      slots.set(b.key, s);
-      last = { key: b.key, itemId: b.itemId, ...s, dx: b.dx, dy: b.dy, dz: b.dz, level: 1 };
-      cx += b.dx + GAP;
-      maxX = Math.max(maxX, cx);
-      rowDepth = Math.max(rowDepth, b.dz);
+      slots.set(b.key, { x: x + b.dz / 2, z: z + depth - b.dx / 2 });
+      x += b.dz + GAP;
     }
-    const z1 = cz + rowDepth + GAP;
     lanes.push({
       letter: laneLetter(idx),
       stop,
       customers: [...new Set(boxes.map((b) => byId.get(b.itemId)!.customer))],
       x0: originX,
-      x1: Math.max(maxX, originX + 300),
-      z0: laneZ,
-      z1,
+      x1: Math.max(x, originX + 300),
+      z0: z,
+      z1: z + depth,
+      aisleZ: z + depth + AISLE / 2,
     });
-    laneZ = z1 + 90; // corredor entre ruas
+    z += depth + AISLE;
   });
-
-  // Centraliza as ruas em relação ao baú.
-  const total = lanes.length ? lanes[lanes.length - 1].z1 : 0;
-  const shift = centerZ - total / 2;
+  // centraliza em relação ao baú
+  const shift = centerZ - z / 2;
   for (const l of lanes) {
     l.z0 += shift;
     l.z1 += shift;
+    l.aisleZ += shift;
   }
   for (const s of slots.values()) s.z += shift;
   return { slots, lanes };
@@ -323,7 +400,7 @@ export function axleLoads(placed: PlacedBox[], items: CargoItem[], vehicle: Vehi
     let kg = 0;
     let moment = 0;
     for (const p of onBoard) {
-      const w = byId.get(p.itemId)!.weightKg;
+      const w = p.weightKg;
       kg += w;
       moment += w * (p.x + p.dx / 2);
     }

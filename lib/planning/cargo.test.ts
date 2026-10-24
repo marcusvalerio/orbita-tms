@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEMO_ITEMS, VEHICLES, axleLoads, cgWindow, packCargo, stagingLayout } from "./cargo";
+import { DEMO_ITEMS, VEHICLES, axleLoads, cgWindow, packCargo, palletize, stagingLayout } from "./cargo";
 
 const truck = VEHICLES.find((v) => v.id === "truck")!;
 
@@ -29,36 +29,48 @@ test("nenhuma caixa sobrepõe outra nem sai do baú", () => {
   }
 });
 
-test("nada é empilhado sobre carga não empilhável", () => {
+test("tudo vai paletizado: paletes 120×100 e quantidade de volumes preservada", () => {
+  const units = palletize(DEMO_ITEMS);
+  for (const item of DEMO_ITEMS) {
+    const mine = units.filter((u) => u.itemId === item.id);
+    assert.equal(mine.reduce((s, u) => s + u.count, 0), item.quantity, item.id);
+    if (item.kind !== "palete" && item.kind !== "saco") for (const u of mine) assert.deepEqual([u.dx, u.dz], [120, 100]);
+  }
+  // tambores de 2 em 2 (Ø60 cm sobre 120×100), geladeiras uma por palete
+  assert.deepEqual(units.filter((u) => u.itemId === "P4").map((u) => u.count), [2, 2]);
+  assert.deepEqual(units.filter((u) => u.itemId === "P2").map((u) => u.count), [1, 1]);
+});
+
+test("palete só vai em cima de palete empilhável de mesma base", () => {
   const r = packCargo(DEMO_ITEMS, truck);
-  const nonStack = r.placed.filter((p) => !DEMO_ITEMS.find((i) => i.id === p.itemId)!.stackable);
-  for (const base of nonStack) {
-    const above = r.placed.some((p) => Math.abs(p.y - (base.y + base.dy)) < 1e-3 && p.x < base.x + base.dx && base.x < p.x + p.dx && p.z < base.z + base.dz && base.z < p.z + p.dz);
-    assert.ok(!above, `${base.key} tem carga por cima`);
+  for (const top of r.placed.filter((p) => p.y > 0)) {
+    const base = r.placed.find((p) => p.x === top.x && p.z === top.z && Math.abs(p.y + p.dy - top.y) < 1e-3);
+    assert.ok(base && base.stackable && base.y === 0 && base.weightKg >= top.weightKg, `${top.key} sem apoio válido`);
   }
 });
 
-test("pátio: uma rua por parada, A = 1ª entrega, sem sobreposição", () => {
+test("pátio: uma rua por parada, A = 1ª entrega, paletes sem sobreposição", () => {
   const r = packCargo(DEMO_ITEMS, truck);
-  const { slots, lanes } = stagingLayout(r.placed, DEMO_ITEMS, truck.length + 300, truck.width / 2);
+  const { slots, lanes } = stagingLayout(r.placed, DEMO_ITEMS, truck.length + 400, truck.width / 2);
   assert.deepEqual(lanes.map((l) => l.letter), ["A", "B", "C", "D"]);
   assert.equal(lanes[0].stop, 1);
   assert.equal(slots.size, r.placed.length);
-  const boxes = r.placed.map((p) => ({ ...p, ...slots.get(p.key)! }));
-  for (const a of boxes)
-    for (const b of boxes) {
+  // no pátio o palete fica girado: x-extensão = dz, z-extensão = dx
+  const rects = r.placed.map((p) => ({ key: p.key, ...slots.get(p.key)!, hx: p.dz / 2, hz: p.dx / 2 }));
+  for (const a of rects)
+    for (const b of rects) {
       if (a === b) continue;
-      const o = a.x < b.x + b.dx && b.x < a.x + a.dx && a.y < b.y + b.dy && b.y < a.y + a.dy && a.z < b.z + b.dz && b.z < a.z + a.dz;
+      const o = Math.abs(a.x - b.x) < a.hx + b.hx && Math.abs(a.z - b.z) < a.hz + b.hz;
       assert.ok(!o, `${a.key} sobrepõe ${b.key} no pátio`);
     }
 });
-
 test("peso por eixo: soma bate com tara + carga e diminui após cada entrega", () => {
   const r = packCargo(DEMO_ITEMS, truck);
   const loads = axleLoads(r.placed, DEMO_ITEMS, truck);
   const a = truck.axles;
   assert.equal(loads[0].afterStop, 0);
   assert.ok(Math.abs(loads[0].frontKg + loads[0].rearKg - (a.tareFrontKg + a.tareRearKg + r.weightKg)) <= 1);
+  assert.equal(r.unplaced.length, 0);
   for (let i = 1; i < loads.length; i++) assert.ok(loads[i].cargoKg < loads[i - 1].cargoKg);
 });
 

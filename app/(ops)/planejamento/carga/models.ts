@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import type { CargoItem } from "@/lib/planning/cargo";
+import type { CargoItem, PlacedBox } from "@/lib/planning/cargo";
 
 // Modelos 3D desenhados para o Órbita (unidade = 1 cm).
 // Cada carga é um Group com origem no centro da base (y = 0 no piso).
@@ -304,4 +304,36 @@ export function buildForklift(): Forklift {
   for (const z of [-28, 28]) carriage.add(mesh(new THREE.BoxGeometry(110, 4, 10), steel, -55, 2, z));
   group.add(carriage);
   return { group, carriage };
+}
+
+/* --------------------------------------------------------- palete montado */
+
+/**
+ * Palete montado no referencial do baú (dx ao longo de x), origem no centro da base.
+ * Itens que já são palete usam o modelo próprio; o resto vai sobre estrado PBR
+ * com as peças nas posições calculadas na paletização.
+ */
+export function buildUnit(b: PlacedBox, item: CargoItem): THREE.Group {
+  if (!b.cases.length) return buildCargo(item, b.dx, b.dy, b.dz);
+  const g = new THREE.Group();
+  const deck = pallet(b.dx, b.dz);
+  g.add(deck.group);
+  for (const c of b.cases) {
+    const piece = buildCargo(item, c.dx, c.dy, c.dz);
+    piece.position.set(c.x, deck.height + c.y, c.z);
+    g.add(piece);
+  }
+  // cantoneiras e filme nas cargas de várias camadas (amarração para transporte)
+  const top = Math.max(...b.cases.map((c) => c.y + c.dy));
+  if (top > 60 && item.kind !== "eletro") {
+    const film = new THREE.MeshPhysicalMaterial({ color: 0xeef6ff, transparent: true, opacity: 0.22, roughness: 0.15, clearcoat: 1, depthWrite: false });
+    const minX = Math.min(...b.cases.map((c) => c.x - c.dx / 2));
+    const maxX = Math.max(...b.cases.map((c) => c.x + c.dx / 2));
+    const minZ = Math.min(...b.cases.map((c) => c.z - c.dz / 2));
+    const maxZ = Math.max(...b.cases.map((c) => c.z + c.dz / 2));
+    g.add(mesh(new RoundedBoxGeometry(maxX - minX + 2, top, maxZ - minZ + 2, 3, 3), film, (minX + maxX) / 2, deck.height + top / 2, (minZ + maxZ) / 2));
+    const corner = std(0x8a6a3e);
+    for (const x of [minX, maxX]) for (const z of [minZ, maxZ]) g.add(mesh(new THREE.BoxGeometry(5, top - 4, 5), corner, x, deck.height + top / 2, z));
+  }
+  return g;
 }
