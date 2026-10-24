@@ -43,7 +43,8 @@ export function CargoPlanner() {
 
   const vehicle = VEHICLES.find((v) => v.id === vehicleId)!;
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const ordered = useMemo(() => [...items].sort((a, b) => a.stop - b.stop || a.id.localeCompare(b.id)), [items]);
+  // Ordem fixa (a do cadastro): mudar a parada não pode fazer a linha pular de lugar.
+  const ordered = items;
   const focusItem = focus ? byId.get(focus.itemId) : null;
 
   const seek = (to: number, playing = false) => setControl((c) => ({ ...c, playing, seek: { t: to, n: c.seek.n + 1 } }));
